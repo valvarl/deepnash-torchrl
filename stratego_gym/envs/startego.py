@@ -54,7 +54,7 @@ class PlayerStateHandler:
         width: int,
     ):
         self.pieces = np.arange(len(pieces_num))[pieces_num != 0]
-        self.movable_pieces = self.pieces[~np.isin(self.pieces, [Piece.FLAG, Piece.BOMB])]
+        self.movable_pieces = self.pieces[~np.isin(self.pieces, [Piece.FLAG.value, Piece.BOMB.value])]
         self.deploy_idx = 0
         self.deploy_mask = np.copy(deploy_mask)
         # 1st channel is unmoved, 2nd channel is moved, 3rd channel is revealed
@@ -213,7 +213,7 @@ class StrategoEnv(Env):
     def encode_move(self, action: np.ndarray):
         selected_piece = np.sum(action[0] * self.board)
         destination = np.sum(action[1] * self.board)
-        if destination == Piece.EMPTY:
+        if destination == Piece.EMPTY.value:
             return action[1] - action[0]
         else:
             return action[1] - (2 + (selected_piece - 1) / 12) * action[0]
@@ -240,7 +240,7 @@ class StrategoEnv(Env):
                 "moves_since_attack": self.draw_conditions["moves_since_attack"],
                 "game_phase": np.array(self.game_phase.value),
                 "last_selected": None if self.game_phase != GamePhase.MOVE else
-                self.p1_last_selected if self.player == Player.RED else self.p2_last_selected}
+                self.p1.last_selected if self.player == Player.RED else self.p2.last_selected}
     
     def step(self, action: tuple):
         # Convert ndarray action to tuple if necessary
@@ -257,13 +257,13 @@ class StrategoEnv(Env):
                 # raise ValueError("Invalid Deployment Location")
 
             if self.player == Player.RED:
-                self.board[action] = np.repeat(self.p1.pieces, self.p1.pieces)[self.p1.deploy_idx]
+                self.board[action] = np.repeat(np.arange(Piece.unique_pieces_num(),)[self.p1.unrevealed != 0] + 2, self.p1.unrevealed)[self.p1.deploy_idx]
                 self.p1.deploy_idx += 1
             else:
-                self.board[action] = np.repeat(self.p2.pieces, self.p2.pieces)[self.p2.deploy_idx]
+                self.board[action] = np.repeat(np.arange(Piece.unique_pieces_num(),)[self.p2.unrevealed != 0] + 2, self.p2.unrevealed)[self.p2.deploy_idx]
                 self.p2.deploy_idx += 1
 
-            if self.p2.deploy_idx == len(self.p2.pieces):
+            if self.p2.deploy_idx == self.p2.unrevealed.sum():
                 self.game_phase = GamePhase.SELECT
 
             self.board = np.rot90(self.board, 2) * -1
@@ -277,18 +277,18 @@ class StrategoEnv(Env):
                 # raise ValueError("Invalid Piece Selection")
 
             if self.player == Player.RED:
-                self.p1_last_selected = action
+                self.p1.last_selected = action
             else:
-                self.p2_last_selected = action
+                self.p2.last_selected = action
 
-            self.game_phase = GamePhase.MOVEMENT
+            self.game_phase = GamePhase.MOVE
             return self.generate_env_state(), 0, False, False, self.get_info()
 
         else:
             return self.movement_step(action)
         
     def movement_step(self, action: tuple):
-        source = self.p1_last_selected if self.player == 1 else self.p2_last_selected
+        source = self.p1.last_selected if self.player == Player.RED else self.p2.last_selected
         dest = action
 
         # Action is a tuple representing a coordinate on the board
@@ -311,15 +311,16 @@ class StrategoEnv(Env):
         terminated = False
 
         # Check if draw conditions are met
-        if self.draw_conditions["total_moves"] >= 2000 or self.draw_conditions["moves_since_attack"] >= 200:
+        if self.draw_conditions["total_moves"] >= self.total_moves_limit or \
+            self.draw_conditions["moves_since_attack"] >= self.moves_since_attack_limit:
             self.board = np.rot90(self.board, 2) * -1
-            self.player *= -1
+            self.player = Player(self.player.value * -1)
             self.game_phase = GamePhase.TERMINAL
             return self.generate_env_state(), 0, True, False, self.get_info()
 
         # Update Draw conditions
         self.draw_conditions["total_moves"] += 1
-        if destination == Piece.EMPTY:
+        if destination == Piece.EMPTY.value:
             self.draw_conditions["moves_since_attack"] += 1
         else:
             self.draw_conditions["moves_since_attack"] = 0
@@ -327,8 +328,8 @@ class StrategoEnv(Env):
         # Update Move Histories
         self.p1.observed_moves = np.roll(self.p1.observed_moves, 1, axis=0)
         self.p2.observed_moves = np.roll(self.p2.observed_moves, 1, axis=0)
-        cur_player_moves = self.p1.observed_moves if self.player == 1 else self.p2.observed_moves
-        other_player_moves = self.p2.observed_moves if self.player == 1 else self.p1.observed_moves
+        cur_player_moves = self.p1.observed_moves if self.player == Player.RED else self.p2.observed_moves
+        other_player_moves = self.p2.observed_moves if self.player == Player.RED else self.p1.observed_moves
 
         move = self.encode_move(action)
         cur_player_moves[0] = move
@@ -336,17 +337,17 @@ class StrategoEnv(Env):
 
         # Perform Move Logic
         if self.player == Player.RED:
-            cur_player_public_info = self.p1.public_obs_info if self.player == 1 else self.p2.public_obs_info
-            cur_player_unrevealed = self.p1.unrevealed if self.player == 1 else self.p2.unrevealed
-            other_player_public_info = self.p2.public_obs_info if self.player == 1 else self.p1.public_obs_info
-            other_player_unrevealed = self.p2.unrevealed if self.player == 1 else self.p1.unrevealed
+            cur_player_public_info = self.p1.public_obs_info if self.player == Player.RED else self.p2.public_obs_info
+            cur_player_unrevealed = self.p1.unrevealed if self.player == Player.RED else self.p2.unrevealed
+            other_player_public_info = self.p2.public_obs_info if self.player == Player.RED else self.p1.public_obs_info
+            other_player_unrevealed = self.p2.unrevealed if self.player == Player.RED else self.p1.unrevealed
         else:
             cur_player_public_info = self.p2.public_obs_info
             cur_player_unrevealed = self.p2.unrevealed
             other_player_public_info = self.p1.public_obs_info
             other_player_unrevealed = self.p1.unrevealed
 
-        if ((selected_piece != Piece.MINER and destination == -Piece.BOMB) or  # Bomb
+        if ((selected_piece != Piece.MINER.value and destination == -Piece.BOMB.value) or  # Bomb
                 (selected_piece == -destination)):  # Equal Strength
             # Remove Both Pieces
             self.board *= np.prod(1 - action, axis=0)
@@ -354,14 +355,14 @@ class StrategoEnv(Env):
             other_player_public_info *= np.rot90(np.prod(1 - action, axis=0), 2)
             cur_player_unrevealed[selected_piece] -= 1
             other_player_unrevealed[destination] -= 1
-        elif ((selected_piece == Piece.SPY and destination == -Piece.MARSHAL) or  # Spy vs Marshal
+        elif ((selected_piece == Piece.SPY.value and destination == -Piece.MARSHAL.value) or  # Spy vs Marshal
               (selected_piece > -destination) or  # Attacker is stronger (Bomb case already handled)
-              (destination == -Piece.FLAG)):  # Enemy Flag Found
+              (destination == -Piece.FLAG.value)):  # Enemy Flag Found
             # Remove Enemy Piece
             self.board *= np.prod(1 - action, axis=0)
             self.board += action[1] * selected_piece
             cur_player_public_info *= 1 - action[0]
-            if destination != Piece.EMPTY:
+            if destination != Piece.EMPTY.value:
                 cur_player_public_info[2] += action[1] * selected_piece
                 other_player_public_info *= np.rot90(1 - action[1], 2)
                 cur_player_unrevealed[selected_piece] -= 1
@@ -374,7 +375,7 @@ class StrategoEnv(Env):
                 else:
                     cur_player_public_info[1] += action[1]
 
-            if destination == -Piece.FLAG:
+            if destination == -Piece.FLAG.value:
                 reward = 1
                 terminated = True
         elif selected_piece < -destination:
@@ -387,12 +388,12 @@ class StrategoEnv(Env):
             other_player_unrevealed[destination] -= 1
 
         self.board = np.rot90(self.board, 2) * -1
-        self.player *= -1
+        self.player = Player(self.player.value * -1)
 
         # Check if any pieces can be moved. If one player has no movable pieces, the other player wins.
         # If both players have no movable pieces, the game is a draw.
-        if not terminated and (np.sum(self.board >= Piece.SPY) == 0 or self.valid_pieces_to_select().sum() == 0):
-            draw_game = (np.sum(self.board <= -Piece.SPY) == 0) or self.valid_pieces_to_select(is_other_player=True).sum() == 0
+        if not terminated and (np.sum(self.board >= Piece.SPY.value) == 0 or self.valid_pieces_to_select().sum() == 0):
+            draw_game = (np.sum(self.board <= -Piece.SPY.value) == 0) or self.valid_pieces_to_select(is_other_player=True).sum() == 0
             self.game_phase = GamePhase.TERMINAL
             return self.generate_env_state(), 0 if draw_game else 1, True, False, self.get_info()
 
@@ -421,18 +422,18 @@ class StrategoEnv(Env):
             return False, msg
 
         selected_piece = self.board[src]
-        if selected_piece < Piece.SPY:
+        if selected_piece < Piece.SPY.value:
             return False, "Selected piece cannot be moved by player"
 
         destination = self.board[dest]
 
-        if abs(destination) == Piece.LAKE:
+        if abs(destination) == Piece.LAKE.value:
             return False, "Destination is an obstacle"
 
-        if destination > Piece.LAKE:
+        if destination > Piece.LAKE.value:
             return False, "Destination is already occupied by player's piece"
 
-        if selected_piece != Piece.SCOUT:
+        if selected_piece != Piece.SCOUT.value:
             selected_piece_coord = np.array(src)
             destination_coord = np.array(dest)
             if np.sum(np.abs(selected_piece_coord - destination_coord)) != 1:
@@ -461,8 +462,8 @@ class StrategoEnv(Env):
         return (self.board == Piece.EMPTY.value) & deploy_mask
 
     def valid_pieces_to_select(self, is_other_player=False) -> np.ndarray:
-        padded_board = np.pad(self.board, 1, constant_values=Piece.LAKE)
-        padded_board[padded_board == -Piece.LAKE] = Piece.LAKE
+        padded_board = np.pad(self.board, 1, constant_values=Piece.LAKE.value)
+        padded_board[padded_board == -Piece.LAKE.value] = Piece.LAKE.value
 
         # Shift the padded array in all four directions
         shift_left = np.roll(padded_board, 1, axis=1)[1:-1, 1:-1]
@@ -471,23 +472,23 @@ class StrategoEnv(Env):
         shift_down = np.roll(padded_board, -1, axis=0)[1:-1, 1:-1]
 
         # Check conditions to create the boolean array
-        surrounded = (shift_left >= Piece.LAKE) & (shift_right >= Piece.LAKE) & (shift_up >= Piece.LAKE) & (
-                shift_down >= Piece.LAKE)
+        surrounded = (shift_left >= Piece.LAKE.value) & (shift_right >= Piece.LAKE.value) & (shift_up >= Piece.LAKE.value) & (
+                shift_down >= Piece.LAKE.value)
 
-        return np.logical_and((self.board <= -Piece.SPY) if is_other_player else (self.board >= Piece.SPY), ~surrounded).astype(int)
+        return np.logical_and((self.board <= -Piece.SPY.value) if is_other_player else (self.board >= Piece.SPY.value), ~surrounded).astype(int)
 
     def valid_destinations(self):
         if self.game_phase != GamePhase.MOVE:
             return np.zeros_like(self.board)
 
-        selected = self.p1_last_selected if self.player == 1 else self.p2_last_selected
+        selected = self.p1.last_selected if self.player == Player.RED else self.p2.last_selected
         selected_piece_val = self.board[selected]
         board_shape = np.array(self.board.shape)
 
         directions = np.array([[0, 0, 1, -1], [1, -1, 0, 0]])
         destinations = np.zeros_like(self.board)
 
-        if selected_piece_val == Piece.SCOUT:
+        if selected_piece_val == Piece.SCOUT.value:
             for direction in directions.T:
                 positions = np.array(selected)[:, None] + direction[:, None]
                 encountered_enemy = 0
@@ -496,8 +497,8 @@ class StrategoEnv(Env):
                         and np.all(positions < board_shape[:, None], axis=0)
                         and encountered_enemy < 1
                 ):
-                    if self.board[positions[0], positions[1]] != Piece.EMPTY:
-                        if self.board[positions[0], positions[1]] > -Piece.FLAG:
+                    if self.board[positions[0], positions[1]] != Piece.EMPTY.value:
+                        if self.board[positions[0], positions[1]] > -Piece.FLAG.value:
                             break
                         encountered_enemy += 1
                     destinations[positions[0], positions[1]] = 1
@@ -512,8 +513,8 @@ class StrategoEnv(Env):
                               (np.all(positions < board_shape[:, None], axis=0))
                               ]
             mask = (
-                    (self.board[valid_positions[0], valid_positions[1]] <= Piece.EMPTY) &
-                    (self.board[valid_positions[0], valid_positions[1]] != -Piece.LAKE)
+                    (self.board[valid_positions[0], valid_positions[1]] <= Piece.EMPTY.value) &
+                    (self.board[valid_positions[0], valid_positions[1]] != -Piece.LAKE.value)
             )
             valid_positions = valid_positions[:, mask]
             destinations[valid_positions[0], valid_positions[1]] = 1
@@ -551,7 +552,7 @@ class StrategoEnv(Env):
         num_cells_c = self.board.shape[1]
 
         board = np.copy(self.board)
-        if self.player == -1:
+        if self.player == Player.BLUE:
             board = np.rot90(board, 2) * -1
 
         font = pygame.font.Font(None, 80)
@@ -560,16 +561,16 @@ class StrategoEnv(Env):
             for c in range(num_cells_c):
                 rect = pygame.Rect(c * cell_size[0], r * cell_size[1], cell_size[0], cell_size[1])
                 rect_center = rect.center
-                if abs(board[r][c]) == Piece.LAKE:
+                if abs(board[r][c]) == Piece.LAKE.value:
                     pygame.draw.rect(self.window, (158, 194, 230), rect)
                     text = None
-                elif board[r][c] >= Piece.FLAG:
+                elif board[r][c] >= Piece.FLAG.value:
                     pygame.draw.rect(self.window, (217, 55, 58), rect)
-                    render_text = 'F' if board[r][c] == Piece.FLAG else 'B' if board[r][c] == Piece.BOMB else str(board[r][c] - 3)
+                    render_text = 'F' if board[r][c] == Piece.FLAG.value else 'B' if board[r][c] == Piece.BOMB.value else str(board[r][c] - 3)
                     text = font.render(render_text, True, (255, 255, 255))
-                elif board[r][c] <= -Piece.FLAG:
+                elif board[r][c] <= -Piece.FLAG.value:
                     pygame.draw.rect(self.window, (24, 118, 181), rect)
-                    render_text = 'F' if board[r][c] == -Piece.FLAG else 'B' if board[r][c] == -Piece.BOMB else str(-(board[r][c] + 3))
+                    render_text = 'F' if board[r][c] == -Piece.FLAG.value else 'B' if board[r][c] == -Piece.BOMB.value else str(-(board[r][c] + 3))
                     text = font.render(render_text, True, (255, 255, 255))
                 else:
                     pygame.draw.rect(self.window, (242, 218, 180), rect)

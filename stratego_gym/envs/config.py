@@ -118,7 +118,7 @@ class StrategoConfig:
         return mask
     
     def _pieces_to_array(self, pieces_num: dict[Piece, int]) -> np.ndarray:
-        pieces = np.zeros((Piece.unique_pieces_num(),))
+        pieces = np.zeros((Piece.unique_pieces_num(),), dtype=np.int64)
         for piece, num in pieces_num.items():
             if piece.value < Piece.FLAG.value:
                 raise ValueError("")

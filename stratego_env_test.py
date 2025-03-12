@@ -26,8 +26,8 @@ def basic_test():
         action = env.action_space.sample()
         print(action)
         state, reward, terminated, truncated, info = env.step(action)
-        # env.render()
-        # time.sleep(0.1)
+        env.render()
+        time.sleep(0.1)
         count += 1
         if terminated:
             games += 1
