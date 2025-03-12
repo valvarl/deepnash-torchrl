@@ -5,7 +5,7 @@ from enum import Enum
 
 import numpy as np
 
-from primitives import Piece, Pos
+from stratego_gym.envs.primitives import Piece, Pos
 
 PIECES_NUM_ORIGINAL = {
     Piece.FLAG: 1,
@@ -58,8 +58,8 @@ class StrategoConfig:
         lakes_mask: np.ndarray | None = None,
         p1_deploy_mask: np.ndarray | None = None,
         p2_deploy_mask: np.ndarray | None = None,
-        max_total_moves: int = 2000,
-        max_moves_since_attack: int | None = 200,
+        total_moves_limit: int = 2000,
+        moves_since_attack_limit: int | None = 200,
         observed_history_entries: int = 0,
         allow_competitive_deploy: bool = False,
         game_mode: GameMode | None = None,
@@ -78,10 +78,10 @@ class StrategoConfig:
 
         self.lakes_mask = self._resolve_mask(lakes, lakes_mask)
 
-        self.max_total_moves = max_total_moves
-        self.max_moves_since_attack = max_moves_since_attack
-        if max_moves_since_attack is None:
-            self.max_moves_since_attack = self.max_total_moves
+        self.total_moves_limit = total_moves_limit
+        self.moves_since_attack_limit = moves_since_attack_limit
+        if moves_since_attack_limit is None:
+            self.moves_since_attack_limit = self.total_moves_limit
         self.observed_history_entries = observed_history_entries
 
         self.allow_competitive_deploy = allow_competitive_deploy
@@ -114,14 +114,15 @@ class StrategoConfig:
         for (y1, x1), (y2, x2) in positions:
             y1, y2 = (y1, y2) if y1 < y2 else (y2, y1)
             x1, x2 = (x1, x2) if x1 < x2 else (x2, x1)
-            mask[y1:y2, x1:x2] = 1
+            mask[y1: y2 + 1, x1: x2 + 1] = 1
         return mask
     
     def _pieces_to_array(self, pieces_num: dict[Piece, int]) -> np.ndarray:
-        pieces = np.array((len(Piece),), dtype=np.int64)
+        pieces = np.zeros((Piece.unique_pieces_num(),))
         for piece, num in pieces_num.items():
-            assert piece != Piece.EMPTY and piece != Piece.LAKE
-            pieces[piece.value - 2] = num
+            if piece.value < Piece.FLAG.value:
+                raise ValueError("")
+            pieces[piece.value - Piece.FLAG.value] = num
         return pieces
     
     def _validate(self) -> tuple[bool, str]:
@@ -129,11 +130,13 @@ class StrategoConfig:
             return False, ""
         elif (self.p2_deploy_mask & self.lakes_mask).any():
             return False, ""
-
-        if self.allow_competitive_deploy:
+        
+        if not self.allow_competitive_deploy:
             if (self.p1_deploy_mask & self.p2_deploy_mask).any():
                 return False, ""
             if self.p1_deploy_mask.sum() < self.p1_pieces_num.sum():
+                return False, ""
+            if self.p2_deploy_mask.sum() < self.p2_pieces_num.sum():
                 return False, ""
         
         else:
@@ -142,12 +145,12 @@ class StrategoConfig:
             p2_own_places = (xor & self.p2_deploy_mask).sum()
             if self.p1_pieces_num.sum() - p1_own_places + self.p2_pieces_num.sum() - p2_own_places > \
             (self.p1_deploy_mask & self.p2_deploy_mask).sum():
-                return False, ""
+                return False, ""        
             
-        if self.max_total_moves <= 0:
+        if self.total_moves_limit <= 0:
             return False, ""
         
-        if self.max_moves_since_attack <= 0:
+        if self.moves_since_attack_limit <= 0:
             return False, ""
             
         if self.observed_history_entries < 0:

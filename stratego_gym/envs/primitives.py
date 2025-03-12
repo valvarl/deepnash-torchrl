@@ -3,7 +3,7 @@ from enum import Enum, auto
 
 
 class Piece(Enum):
-    EMPTY = auto()
+    EMPTY = 0
     LAKE = auto()
     FLAG = auto()
     BOMB = auto()
@@ -19,7 +19,7 @@ class Piece(Enum):
     MARSHAL = auto()
 
     @classmethod
-    def __len__(cls):
-        return cls.MARSHAL.value - 1
+    def unique_pieces_num(cls):
+        return cls.MARSHAL.value - cls.FLAG.value + 1
 
 type Pos = tuple[int, int]
