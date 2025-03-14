@@ -34,6 +34,80 @@ def basic_test():
             env.reset()
     print(count)
 
+def two_square_test():
+    env = gym.make("stratego_gym/Stratego-v0", render_mode="human")
+    env.reset()
+
+    for i in range(80):
+        action = env.action_space.sample()
+        state, reward, terminated, truncated, info = env.step(action)
+
+    env.render()
+    time.sleep(1)
+
+    env.step((6, 0))
+    env.step((5, 0))
+
+    env.render()
+    time.sleep(1)
+
+    env.step((6, 0))
+    env.step((5, 0))
+
+    env.render()
+    time.sleep(1)
+
+    env.step((7, 0))
+    env.step((6, 0))
+
+    env.render()
+    time.sleep(1)
+
+    env.step((5, 0))
+    env.step((6, 0))
+
+    env.render()
+    time.sleep(1)
+
+    env.step((6, 0))
+    env.step((7, 0))
+
+    env.render()
+    time.sleep(1)
+
+    env.step((6, 0))
+    env.step((5, 0))
+
+    env.render()
+    time.sleep(1)
+
+    env.step((7, 0))
+    env.step((6, 0))
+
+    env.render()
+    time.sleep(1)
+
+    env.step((5, 0))
+    env.step((6, 0))
+
+    env.render()
+    time.sleep(1)
+
+    env.step((6, 0))
+    env.step((7, 0))
+
+    env.render()
+    time.sleep(1)
+
+    env.step((6, 0))
+    env.step((5, 0))
+
+    env.render()
+    time.sleep(1)
+
+    # print(env.p1.observed_moves[:5])
+
+
 def policy_test():
     device = "cuda"
     # agent = DeepNashAgent().to(device)
@@ -109,5 +183,6 @@ def vectorized_test(n_procs, n_workers):
 if __name__ == '__main__':
     # vectorized_test(10, 4)
     # policy_test()
-    basic_test()
+    # basic_test()
     # rollout_test()
+    two_square_test()

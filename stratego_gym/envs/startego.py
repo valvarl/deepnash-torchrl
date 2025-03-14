@@ -64,7 +64,7 @@ class PlayerStateHandler:
         self.unrevealed = np.copy(pieces_num)
         print(self.unrevealed)
         # exit()
-        self.observed_moves = np.zeros((max(observed_history_entries, 3), height, width))
+        self.observed_moves = np.zeros((max(observed_history_entries, 6), height, width))
 
 
 class StrategoEnv(Env):
@@ -100,6 +100,7 @@ class StrategoEnv(Env):
         self.draw_conditions = {"total_moves": 0, "moves_since_attack": 0}
 
         self.allowed_pieces = None
+        self.chase_moves = None
         self.observation_space = self._get_observation_space()
         self.action_space: MaskedMultiDiscrete = self._get_action_space()
         
@@ -139,6 +140,7 @@ class StrategoEnv(Env):
 
         self.observed_history_entries = self.config.observed_history_entries
         self.allowed_pieces = self.config.allowed_pieces
+        self.chase_moves = []
         
         self.board = np.zeros((self.height, self.width), dtype=np.int64)
         self.lakes = np.copy(self.config.lakes_mask)
@@ -486,30 +488,12 @@ class StrategoEnv(Env):
         # Check Two-Square rule
         player = self.player if not is_other_player else Player(self.player.value * -1)
         if player == Player.RED:
-            # print(self.p1.observed_moves[0] == self.p1.observed_moves[1])
-            if (self.p1.observed_moves[0] == -self.p1.observed_moves[1]).all():
-                if self.p1.observed_moves[0].sum() != 0:
-                    print(self.p1.observed_moves[0])
-                    exit()
-                # print(np.abs(self.p1.observed_moves[:3]).sum())
-                # if (np.abs(self.p1.observed_moves[:3]).sum() > 0):
-                #     print(123)
-                #     exit()
-                # and \
-                # np.abs(self.p1.observed_moves[:3]).sum() == 6:
-                # previous_square_piece = (self.board * self.p1.observed_moves[0] == -1).sum()
-                # if previous_square_piece < Piece.LAKE.value:
-                #     print('MIGHT REPETITION')
-                #     print('board\n', self.board)
-                #     print('player\n', player)
-                #     print('hist\n', self.p1.observed_moves[:3])
-                #     print('previous_square_piece\n', previous_square_piece)
-                #     print('surrounded\n', surrounded)
-                #     exit()
-                #     surrounded += np.uint8(self.p1.observed_moves[0] > 0)
+            if np.sum((self.p1.observed_moves[1] * self.p1.observed_moves[3] * self.p1.observed_moves[5]) != 0) == 2:
+                surrounded += np.uint8(self.p1.observed_moves[1] > 0)
+
         else:
-            if (self.p2.observed_moves[0] == self.p2.observed_moves[2]).all() and (self.p2.observed_moves[0] == -self.p2.observed_moves[1]).all():
-                surrounded += np.uint8(self.p2.observed_moves[0] > 0)
+            if np.sum((self.p2.observed_moves[1] * self.p2.observed_moves[3] * self.p2.observed_moves[5]) != 0) == 2:
+                surrounded += np.uint8(self.p2.observed_moves[1] > 0)
 
         surrounded = surrounded >= 4
 
