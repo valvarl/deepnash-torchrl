@@ -24,14 +24,13 @@ def basic_test():
     games = 0
     while time.time() - start_time < 60:
         action = env.action_space.sample()
-        print(action)
         state, reward, terminated, truncated, info = env.step(action)
-        env.render()
-        time.sleep(0.1)
+        # env.render()
+        # time.sleep(0.1)
         count += 1
         if terminated:
             games += 1
-            print(f"Game over! Player {-1 * info['cur_player']} received {reward}, game: {games}")
+            print(f"Game over! Player {-1 * info['cur_player']} received {reward}, game: {games}, turn: {info['total_moves']}")
             env.reset()
     print(count)
 

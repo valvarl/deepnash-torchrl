@@ -60,7 +60,7 @@ class StrategoConfig:
         p2_deploy_mask: np.ndarray | None = None,
         total_moves_limit: int = 2000,
         moves_since_attack_limit: int | None = 200,
-        observed_history_entries: int = 0,
+        observed_history_entries: int = 40,
         allow_competitive_deploy: bool = False,
         game_mode: GameMode | None = None,
     ):
@@ -75,6 +75,8 @@ class StrategoConfig:
             self.p2_pieces_num = self._pieces_to_array(p2_pieces_num)
         else:
             self.p2_pieces_num = self.p1_pieces_num.copy()
+
+        self.allowed_pieces = np.arange(len(self.p1_pieces_num))[(self.p1_pieces_num != 0) | (self.p2_pieces_num != 0)]
 
         self.lakes_mask = self._resolve_mask(lakes, lakes_mask)
 
@@ -118,11 +120,11 @@ class StrategoConfig:
         return mask
     
     def _pieces_to_array(self, pieces_num: dict[Piece, int]) -> np.ndarray:
-        pieces = np.zeros((Piece.unique_pieces_num(),), dtype=np.int64)
+        pieces = np.zeros((len(Piece),), dtype=np.int64)
         for piece, num in pieces_num.items():
             if piece.value < Piece.FLAG.value:
                 raise ValueError("")
-            pieces[piece.value - Piece.FLAG.value] = num
+            pieces[piece.value] = num
         return pieces
     
     def _validate(self) -> tuple[bool, str]:

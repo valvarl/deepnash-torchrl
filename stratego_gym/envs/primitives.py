@@ -18,8 +18,4 @@ class Piece(Enum):
     GENERAL = 12
     MARSHAL = 13
 
-    @classmethod
-    def unique_pieces_num(cls):
-        return cls.MARSHAL.value - cls.FLAG.value + 1
-
 type Pos = tuple[int, int]

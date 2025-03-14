@@ -55,14 +55,16 @@ class PlayerStateHandler:
     ):
         self.pieces = np.arange(len(pieces_num))[pieces_num != 0]
         self.movable_pieces = self.pieces[~np.isin(self.pieces, [Piece.FLAG.value, Piece.BOMB.value])]
+        print(self.pieces)
+        print(self.movable_pieces)
         self.deploy_idx = 0
         self.deploy_mask = np.copy(deploy_mask)
         # 1st channel is unmoved, 2nd channel is moved, 3rd channel is revealed
         self.public_obs_info = np.zeros((3, height, width))
-        # TODO: check whether deploy_mask or deploy_mask_opponent is needed
-        self.public_obs_info[0, self.deploy_mask] = 1
         self.unrevealed = np.copy(pieces_num)
-        self.observed_moves = np.zeros((observed_history_entries, height, width))
+        print(self.unrevealed)
+        # exit()
+        self.observed_moves = np.zeros((max(observed_history_entries, 3), height, width))
 
 
 class StrategoEnv(Env):
@@ -97,14 +99,12 @@ class StrategoEnv(Env):
 
         self.draw_conditions = {"total_moves": 0, "moves_since_attack": 0}
 
-        self.observation_channels = None
+        self.allowed_pieces = None
         self.observation_space = self._get_observation_space()
         self.action_space: MaskedMultiDiscrete = self._get_action_space()
         
     def _get_observation_space(self):
-        observation_channels = ((self.config.p1_pieces_num != 0) | (self.config.p2_pieces_num != 0)).sum() * 3 + \
-        self.config.observed_history_entries + 6
-
+        observation_channels = len(self.config.allowed_pieces) * 3 + self.config.observed_history_entries + 6
         shape = (observation_channels, self.config.height, self.config.width)
         mask_shape = (self.config.height, self.config.width)
 
@@ -138,12 +138,8 @@ class StrategoEnv(Env):
         self.draw_conditions = {"total_moves": 0, "moves_since_attack": 0}
 
         self.observed_history_entries = self.config.observed_history_entries
-        self.observation_channels = ((self.config.p1_pieces_num != 0) | (self.config.p2_pieces_num != 0)).sum()
+        self.allowed_pieces = self.config.allowed_pieces
         
-        self.generate_board()
-        return self.generate_env_state(), self.get_info()
-    
-    def generate_board(self):
         self.board = np.zeros((self.height, self.width), dtype=np.int64)
         self.lakes = np.copy(self.config.lakes_mask)
         self.board[self.lakes] = Piece.LAKE.value
@@ -153,13 +149,16 @@ class StrategoEnv(Env):
         self.p2.generate_state(self.config.p2_pieces_num, self.config.p2_deploy_mask, 
                                      self.observed_history_entries, self.height, self.width)
 
+        return self.generate_env_state(), self.get_info()
+        
+
     def generate_observation(self):
         lakes = self.lakes[None, :]
-        private_obs = np.eye(self.observation_channels)[np.where(self.board > Piece.LAKE.value, self.board - 2, 0)].transpose(2, 0, 1)
+        private_obs = np.eye(len(Piece))[np.where(self.board > Piece.LAKE.value, self.board, 0)].transpose(2, 0, 1)[self.allowed_pieces]
 
         if self.game_phase == GamePhase.DEPLOY:
-            public_obs = np.zeros((self.observation_channels, self.height, self.width))
-            opp_public_obs = np.zeros((self.observation_channels, self.height, self.width))
+            public_obs = np.zeros((len(self.allowed_pieces), self.height, self.width))
+            opp_public_obs = np.zeros((len(self.allowed_pieces), self.height, self.width))
             moves_obs = np.zeros_like(self.p1.observed_moves)
         else:
             public_obs1 = self.get_public_obs(self.p1.public_obs_info, self.p1.unrevealed, self.p1.pieces, self.p1.movable_pieces)
@@ -189,7 +188,6 @@ class StrategoEnv(Env):
         else:
             action_mask = self.valid_destinations()
         self.action_space.set_mask(action_mask.astype(bool))
-        print(action_mask)
         return {"obs": obs, "action_mask": action_mask}
     
     def get_public_obs(self, public_obs_info, unrevealed, pieces, movable_pieces):
@@ -216,7 +214,7 @@ class StrategoEnv(Env):
         if destination == Piece.EMPTY.value:
             return action[1] - action[0]
         else:
-            return action[1] - (2 + (selected_piece - 1) / 12) * action[0]
+            return action[1] - (2 + (selected_piece - 3) / 12) * action[0]
 
     def get_info(self):
         """
@@ -234,8 +232,8 @@ class StrategoEnv(Env):
         board = np.copy(self.board)
         if self.player == Player.BLUE:
             board = np.rot90(board, 2) * -1
-        return {"cur_player": np.array(self.player.value), "cur_board": board, #"pieces": self.pieces,
-                #"board_shape": self.board.shape, "num_pieces": len(self.pieces),
+        return {"cur_player": np.array(self.player.value), "cur_board": board, "pieces": self.allowed_pieces,
+                "board_shape": self.board.shape, "num_pieces": len(self.allowed_pieces),
                 "total_moves": self.draw_conditions["total_moves"],
                 "moves_since_attack": self.draw_conditions["moves_since_attack"],
                 "game_phase": np.array(self.game_phase.value),
@@ -253,18 +251,28 @@ class StrategoEnv(Env):
 
         if self.game_phase == GamePhase.DEPLOY:
             if self.valid_spots_to_place()[action] == 0:
-                action = tuple(self.action_space.sample())
-                # raise ValueError("Invalid Deployment Location")
+                # action = tuple(self.action_space.sample())
+                raise ValueError("Invalid Deployment Location")
 
             if self.player == Player.RED:
-                self.board[action] = np.repeat(np.arange(Piece.unique_pieces_num(),)[self.p1.unrevealed != 0] + 2, self.p1.unrevealed)[self.p1.deploy_idx]
+                self.board[action] = np.repeat(np.arange(len(Piece),), self.p1.unrevealed)[self.p1.deploy_idx]
                 self.p1.deploy_idx += 1
+                if self.p2.deploy_idx == self.p2.unrevealed.sum() and self.p1.deploy_idx != self.p1.unrevealed.sum():
+                    return self.generate_env_state(), 0, False, False, self.get_info()
             else:
-                self.board[action] = np.repeat(np.arange(Piece.unique_pieces_num(),)[self.p2.unrevealed != 0] + 2, self.p2.unrevealed)[self.p2.deploy_idx]
+                self.board[action] = np.repeat(np.arange(len(Piece),), self.p2.unrevealed)[self.p2.deploy_idx]
                 self.p2.deploy_idx += 1
+                if self.p1.deploy_idx == self.p1.unrevealed.sum() and self.p2.deploy_idx != self.p2.unrevealed.sum():
+                    return self.generate_env_state(), 0, False, False, self.get_info()
 
-            if self.p2.deploy_idx == self.p2.unrevealed.sum():
+            if self.p1.deploy_idx == self.p1.unrevealed.sum() and self.p2.deploy_idx == self.p2.unrevealed.sum():
                 self.game_phase = GamePhase.SELECT
+                if self.player == Player.RED:
+                    self.p1.public_obs_info[0, self.board * self.p1.deploy_mask > 0] = 1
+                    self.p2.public_obs_info[0, np.rot90(self.board * self.p2.deploy_mask > 0, 2)] = 1
+                else:
+                    self.p1.public_obs_info[0, np.rot90(self.board * self.p1.deploy_mask > 0, 2)] = 1
+                    self.p2.public_obs_info[0, self.board * self.p2.deploy_mask > 0] = 1
 
             self.board = np.rot90(self.board, 2) * -1
             self.player = Player(self.player.value * -1)
@@ -273,8 +281,8 @@ class StrategoEnv(Env):
 
         elif self.game_phase == GamePhase.SELECT:
             if self.valid_pieces_to_select()[action] == 0:
-                action = tuple(self.action_space.sample())
-                # raise ValueError("Invalid Piece Selection")
+                # action = tuple(self.action_space.sample())
+                raise ValueError("Invalid Piece Selection")
 
             if self.player == Player.RED:
                 self.p1.last_selected = action
@@ -347,8 +355,7 @@ class StrategoEnv(Env):
             other_player_public_info = self.p1.public_obs_info
             other_player_unrevealed = self.p1.unrevealed
 
-        if ((selected_piece != Piece.MINER.value and destination == -Piece.BOMB.value) or  # Bomb
-                (selected_piece == -destination)):  # Equal Strength
+        if (selected_piece == -destination):  # Equal Strength
             # Remove Both Pieces
             self.board *= np.prod(1 - action, axis=0)
             cur_player_public_info *= np.prod(1 - action, axis=0)
@@ -356,7 +363,7 @@ class StrategoEnv(Env):
             cur_player_unrevealed[selected_piece] -= 1
             other_player_unrevealed[destination] -= 1
         elif ((selected_piece == Piece.SPY.value and destination == -Piece.MARSHAL.value) or  # Spy vs Marshal
-              (selected_piece > -destination) or  # Attacker is stronger (Bomb case already handled)
+              (selected_piece > -destination and (selected_piece == Piece.MINER.value and destination == -Piece.BOMB.value or destination != -Piece.BOMB.value)) or  # Attacker is stronger (Bomb case already handled)
               (destination == -Piece.FLAG.value)):  # Enemy Flag Found
             # Remove Enemy Piece
             self.board *= np.prod(1 - action, axis=0)
@@ -378,7 +385,7 @@ class StrategoEnv(Env):
             if destination == -Piece.FLAG.value:
                 reward = 1
                 terminated = True
-        elif selected_piece < -destination:
+        elif selected_piece < -destination or destination == -Piece.BOMB.value:
             # Remove Attacker
             self.board *= 1 - action[0]
             cur_player_public_info *= 1 - action[0]
@@ -458,7 +465,6 @@ class StrategoEnv(Env):
 
     def valid_spots_to_place(self) -> np.ndarray:
         deploy_mask = self.p1.deploy_mask if self.player == Player.RED else np.rot90(self.p2.deploy_mask, 2)
-        print(self.board)
         return (self.board == Piece.EMPTY.value) & deploy_mask
 
     def valid_pieces_to_select(self, is_other_player=False) -> np.ndarray:
@@ -472,8 +478,40 @@ class StrategoEnv(Env):
         shift_down = np.roll(padded_board, -1, axis=0)[1:-1, 1:-1]
 
         # Check conditions to create the boolean array
-        surrounded = (shift_left >= Piece.LAKE.value) & (shift_right >= Piece.LAKE.value) & (shift_up >= Piece.LAKE.value) & (
-                shift_down >= Piece.LAKE.value)
+        surrounded = np.uint8(shift_left >= Piece.LAKE.value) + np.uint8(shift_right >= Piece.LAKE.value) + \
+            np.uint8(shift_up >= Piece.LAKE.value) + np.uint8(shift_down >= Piece.LAKE.value)
+        
+        # print('surrounded\n', surrounded)
+        
+        # Check Two-Square rule
+        player = self.player if not is_other_player else Player(self.player.value * -1)
+        if player == Player.RED:
+            # print(self.p1.observed_moves[0] == self.p1.observed_moves[1])
+            if (self.p1.observed_moves[0] == -self.p1.observed_moves[1]).all():
+                if self.p1.observed_moves[0].sum() != 0:
+                    print(self.p1.observed_moves[0])
+                    exit()
+                # print(np.abs(self.p1.observed_moves[:3]).sum())
+                # if (np.abs(self.p1.observed_moves[:3]).sum() > 0):
+                #     print(123)
+                #     exit()
+                # and \
+                # np.abs(self.p1.observed_moves[:3]).sum() == 6:
+                # previous_square_piece = (self.board * self.p1.observed_moves[0] == -1).sum()
+                # if previous_square_piece < Piece.LAKE.value:
+                #     print('MIGHT REPETITION')
+                #     print('board\n', self.board)
+                #     print('player\n', player)
+                #     print('hist\n', self.p1.observed_moves[:3])
+                #     print('previous_square_piece\n', previous_square_piece)
+                #     print('surrounded\n', surrounded)
+                #     exit()
+                #     surrounded += np.uint8(self.p1.observed_moves[0] > 0)
+        else:
+            if (self.p2.observed_moves[0] == self.p2.observed_moves[2]).all() and (self.p2.observed_moves[0] == -self.p2.observed_moves[1]).all():
+                surrounded += np.uint8(self.p2.observed_moves[0] > 0)
+
+        surrounded = surrounded >= 4
 
         return np.logical_and((self.board <= -Piece.SPY.value) if is_other_player else (self.board >= Piece.SPY.value), ~surrounded).astype(int)
 
@@ -487,6 +525,16 @@ class StrategoEnv(Env):
 
         directions = np.array([[0, 0, 1, -1], [1, -1, 0, 0]])
         destinations = np.zeros_like(self.board)
+
+        two_square_mask = None
+        if self.player == Player.RED:
+            if (self.p1.observed_moves[0] == self.p1.observed_moves[2]).all() and (self.p1.observed_moves[0] == -self.p1.observed_moves[1]).all() and \
+                self.p1.observed_moves[0][selected] == 1:
+                two_square_mask = self.p1.observed_moves[0] == -1
+        else:
+            if (self.p2.observed_moves[0] == self.p2.observed_moves[2]).all() and (self.p2.observed_moves[0] == -self.p2.observed_moves[1]).all() and \
+                self.p2.observed_moves[0][selected] == 1:
+                two_square_mask = self.p2.observed_moves[0] == -1
 
         if selected_piece_val == Piece.SCOUT.value:
             for direction in directions.T:
@@ -503,7 +551,6 @@ class StrategoEnv(Env):
                         encountered_enemy += 1
                     destinations[positions[0], positions[1]] = 1
                     positions += direction[:, None]
-            return destinations
 
         else:
             positions = np.array(selected)[:, None] + directions
@@ -518,7 +565,19 @@ class StrategoEnv(Env):
             )
             valid_positions = valid_positions[:, mask]
             destinations[valid_positions[0], valid_positions[1]] = 1
-            return destinations
+        
+        if two_square_mask is not None:
+            print('HELLO')
+            print('board\n', self.board)
+            print('player\n', self.player)
+            print('hist\n', self.p1.observed_moves[:3])
+            print('hist\n', self.p2.observed_moves[:3])
+            print('destinations\n', destinations)
+            print('two_square_mask\n', two_square_mask)
+            destinations *= ~two_square_mask
+            print('result\n', destinations)
+            exit()
+        return destinations
 
     def get_random_action(self) -> tuple:
         if self.game_phase == GamePhase.DEPLOY:
