@@ -6,8 +6,9 @@ from gymnasium import Env, spaces
 import pygame
 
 from stratego_gym.envs.config import StrategoConfig, GameMode
+from stratego_gym.envs.detectors import TwoSquareDetector, ChasingDetector
 from stratego_gym.envs.masked_multi_descrete import MaskedMultiDiscrete
-from stratego_gym.envs.primitives import Piece, Pos
+from stratego_gym.envs.primitives import Piece, Player, Pos
 
 
 class GamePhase(Enum):
@@ -15,11 +16,6 @@ class GamePhase(Enum):
     DEPLOY = auto()
     SELECT = auto()
     MOVE = auto()
-
-
-class Player(Enum):
-    RED = 1
-    BLUE = -1
 
 # PyGame Rendering Constants
 WINDOW_SIZE = 800
@@ -44,6 +40,7 @@ class PlayerStateHandler:
         self.unrevealed = None
         self.observed_moves = None
         self.last_selected = None
+        self.last_selected_piece = None
 
     def generate_state(
         self,
@@ -63,8 +60,7 @@ class PlayerStateHandler:
         self.public_obs_info = np.zeros((3, height, width))
         self.unrevealed = np.copy(pieces_num)
         print(self.unrevealed)
-        # exit()
-        self.observed_moves = np.zeros((max(observed_history_entries, 6), height, width))
+        self.observed_moves = np.zeros((observed_history_entries, height, width))
 
 
 class StrategoEnv(Env):
@@ -92,6 +88,8 @@ class StrategoEnv(Env):
 
         self.p1 = PlayerStateHandler(Player.RED)
         self.p2 = PlayerStateHandler(Player.BLUE)
+        self.two_square_detector = TwoSquareDetector()
+        self.chasing_detector = ChasingDetector()
 
         self.total_moves_limit: int | None = None
         self.moves_since_attack_limit: int | None = None
@@ -100,7 +98,6 @@ class StrategoEnv(Env):
         self.draw_conditions = {"total_moves": 0, "moves_since_attack": 0}
 
         self.allowed_pieces = None
-        self.chase_moves = None
         self.observation_space = self._get_observation_space()
         self.action_space: MaskedMultiDiscrete = self._get_action_space()
         
@@ -140,7 +137,6 @@ class StrategoEnv(Env):
 
         self.observed_history_entries = self.config.observed_history_entries
         self.allowed_pieces = self.config.allowed_pieces
-        self.chase_moves = []
         
         self.board = np.zeros((self.height, self.width), dtype=np.int64)
         self.lakes = np.copy(self.config.lakes_mask)
@@ -288,8 +284,10 @@ class StrategoEnv(Env):
 
             if self.player == Player.RED:
                 self.p1.last_selected = action
+                self.p1.last_selected_piece = Piece(self.board[action])
             else:
                 self.p2.last_selected = action
+                self.p2.last_selected_piece = Piece(self.board[action])
 
             self.game_phase = GamePhase.MOVE
             return self.generate_env_state(), 0, False, False, self.get_info()
@@ -300,6 +298,11 @@ class StrategoEnv(Env):
     def movement_step(self, action: tuple):
         source = self.p1.last_selected if self.player == Player.RED else self.p2.last_selected
         dest = action
+
+        if self.player == Player.RED:
+            self.p1.last_selected = action
+        else:
+            self.p2.last_selected = action
 
         # Action is a tuple representing a coordinate on the board
         valid, msg = self.check_action_valid(source, dest)
@@ -345,17 +348,14 @@ class StrategoEnv(Env):
         cur_player_moves[0] = move
         other_player_moves[0] = np.rot90(move, 2) * -1
 
+        self.two_square_detector.update(self.player, Piece(selected_piece), source, dest)
+        self.chasing_detector.update(self.player, Piece(selected_piece), source, dest, self.board)
+
         # Perform Move Logic
-        if self.player == Player.RED:
-            cur_player_public_info = self.p1.public_obs_info if self.player == Player.RED else self.p2.public_obs_info
-            cur_player_unrevealed = self.p1.unrevealed if self.player == Player.RED else self.p2.unrevealed
-            other_player_public_info = self.p2.public_obs_info if self.player == Player.RED else self.p1.public_obs_info
-            other_player_unrevealed = self.p2.unrevealed if self.player == Player.RED else self.p1.unrevealed
-        else:
-            cur_player_public_info = self.p2.public_obs_info
-            cur_player_unrevealed = self.p2.unrevealed
-            other_player_public_info = self.p1.public_obs_info
-            other_player_unrevealed = self.p1.unrevealed
+        cur_player_public_info = self.p1.public_obs_info if self.player == Player.RED else self.p2.public_obs_info
+        cur_player_unrevealed = self.p1.unrevealed if self.player == Player.RED else self.p2.unrevealed
+        other_player_public_info = self.p2.public_obs_info if self.player == Player.RED else self.p1.public_obs_info
+        other_player_unrevealed = self.p2.unrevealed if self.player == Player.RED else self.p1.unrevealed
 
         if (selected_piece == -destination):  # Equal Strength
             # Remove Both Pieces
@@ -462,6 +462,12 @@ class StrategoEnv(Env):
 
             if np.any(path_slice != 0):
                 return False, "Pieces in the path of scout"
+            
+        if not self.two_square_detector.validate_move(self.player, Piece(selected_piece), src, dest):
+            return False, f"Two-square rule violation: {self.two_square_detector.get_player(self.player)}"
+        
+        if not self.chasing_detector.validate_move(self.player, Piece(selected_piece), src, dest, self.board):
+            return False, f"More-square rule violation: {self.chasing_detector.chase_moves}"
 
         return True, "Valid Action"
 
@@ -480,22 +486,57 @@ class StrategoEnv(Env):
         shift_down = np.roll(padded_board, -1, axis=0)[1:-1, 1:-1]
 
         # Check conditions to create the boolean array
-        surrounded = np.uint8(shift_left >= Piece.LAKE.value) + np.uint8(shift_right >= Piece.LAKE.value) + \
-            np.uint8(shift_up >= Piece.LAKE.value) + np.uint8(shift_down >= Piece.LAKE.value)
+        surrounded = (shift_left >= Piece.LAKE.value) & (shift_right >= Piece.LAKE.value) & (shift_up >= Piece.LAKE.value) & (
+                 shift_down >= Piece.LAKE.value)
         
-        # print('surrounded\n', surrounded)
-        
-        # Check Two-Square rule
-        player = self.player if not is_other_player else Player(self.player.value * -1)
-        if player == Player.RED:
-            if np.sum((self.p1.observed_moves[1] * self.p1.observed_moves[3] * self.p1.observed_moves[5]) != 0) == 2:
-                surrounded += np.uint8(self.p1.observed_moves[1] > 0)
-
-        else:
-            if np.sum((self.p2.observed_moves[1] * self.p2.observed_moves[3] * self.p2.observed_moves[5]) != 0) == 2:
-                surrounded += np.uint8(self.p2.observed_moves[1] > 0)
-
-        surrounded = surrounded >= 4
+        # Two-square and More-square rules
+        player = self.player if not is_other_player else Player(-1 * self.player.value)
+        p = self.p1 if player == Player.RED else self.p2
+        pos, piece = p.last_selected, p.last_selected_piece
+        if pos is not None:
+            board = self.board if not is_other_player else np.rot90(self.board, 2)
+            valid_two_square, pos_twosq = self.two_square_detector.validate_select(player, piece, pos)
+            valid_chasing, pos_chasing = self.chasing_detector.validate_select(player, piece, pos, board)
+            if not (valid_two_square and valid_chasing):
+                mask = np.zeros((self.height, self.width), dtype=bool)
+                if not valid_two_square:
+                    start_pos, end_pos = pos_twosq
+                    if start_pos == end_pos:
+                        mask[start_pos] = False
+                    else:
+                        if start_pos[0] == end_pos[0]:
+                            mask[start_pos[0], min(start_pos[1], end_pos[1]) + 1: max(start_pos[1], end_pos[1])] = True
+                        else:
+                            mask[min(start_pos[0], end_pos[0]) + 1: max(start_pos[0], end_pos[0]), start_pos[1]] = True
+                
+                if not valid_chasing:
+                    mask[pos_chasing] = False
+                
+                surrounded_square = 0
+                for i, j in zip([-1, 1, 0, 0], [0, 0, -1, 1]):
+                    _pos = pos
+                    while 0 <= _pos[0] < self.height and 0 <= _pos[1] < self.width:
+                        _pos = (_pos[0] + i, _pos[1] + j)
+                        if not is_other_player:
+                            if not mask[_pos]:
+                                if board[_pos] >= Piece.LAKE.value:
+                                    surrounded_square += 1
+                                break
+                        else:
+                            if not mask[_pos]:
+                                if board[_pos] <= -Piece.LAKE.value:
+                                    surrounded_square += 1
+                                break
+                        if piece != Piece.SCOUT:
+                            break
+                    else:
+                        if _pos[0] < 0 or _pos[0] >= self.height:
+                            surrounded_square += 1
+                        elif _pos[1] < 0 or _pos[1] >= self.width:
+                            surrounded_square += 1
+                
+                if surrounded_square == 4:
+                    surrounded[pos] = True
 
         return np.logical_and((self.board <= -Piece.SPY.value) if is_other_player else (self.board >= Piece.SPY.value), ~surrounded).astype(int)
 
@@ -511,14 +552,23 @@ class StrategoEnv(Env):
         destinations = np.zeros_like(self.board)
 
         two_square_mask = None
-        if self.player == Player.RED:
-            if (self.p1.observed_moves[0] == self.p1.observed_moves[2]).all() and (self.p1.observed_moves[0] == -self.p1.observed_moves[1]).all() and \
-                self.p1.observed_moves[0][selected] == 1:
-                two_square_mask = self.p1.observed_moves[0] == -1
-        else:
-            if (self.p2.observed_moves[0] == self.p2.observed_moves[2]).all() and (self.p2.observed_moves[0] == -self.p2.observed_moves[1]).all() and \
-                self.p2.observed_moves[0][selected] == 1:
-                two_square_mask = self.p2.observed_moves[0] == -1
+        valid, positions = self.two_square_detector.validate_select(self.player, Piece(selected_piece_val), selected)
+        if not valid:
+            two_square_mask = np.ones((self.height, self.width), dtype=bool)
+            start_pos, end_pos = positions
+            if start_pos == end_pos:
+                two_square_mask[start_pos] = False
+            else:
+                if start_pos[0] == end_pos[0]:
+                    two_square_mask[start_pos[0], min(start_pos[1], end_pos[1]) + 1: max(start_pos[1], end_pos[1])] = False
+                else:
+                    two_square_mask[min(start_pos[0], end_pos[0]) + 1: max(start_pos[0], end_pos[0]), start_pos[1]] = False
+
+        chasing_mask = None
+        valid, position = self.chasing_detector.validate_select(self.player, Piece(selected_piece_val), selected, self.board)
+        if not valid:
+            chasing_mask = np.ones((self.height, self.width), dtype=bool)
+            chasing_mask[position] = False
 
         if selected_piece_val == Piece.SCOUT.value:
             for direction in directions.T:
@@ -551,16 +601,9 @@ class StrategoEnv(Env):
             destinations[valid_positions[0], valid_positions[1]] = 1
         
         if two_square_mask is not None:
-            print('HELLO')
-            print('board\n', self.board)
-            print('player\n', self.player)
-            print('hist\n', self.p1.observed_moves[:3])
-            print('hist\n', self.p2.observed_moves[:3])
-            print('destinations\n', destinations)
-            print('two_square_mask\n', two_square_mask)
-            destinations *= ~two_square_mask
-            print('result\n', destinations)
-            exit()
+            destinations *= two_square_mask
+        if chasing_mask is not None:
+            destinations *= chasing_mask
         return destinations
 
     def get_random_action(self) -> tuple:

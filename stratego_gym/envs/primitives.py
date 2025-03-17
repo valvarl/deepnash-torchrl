@@ -18,4 +18,8 @@ class Piece(Enum):
     GENERAL = 12
     MARSHAL = 13
 
+class Player(Enum):
+    RED = 1
+    BLUE = -1
+
 type Pos = tuple[int, int]

@@ -41,7 +41,6 @@ class TwoSquareDetector:
 
     def validate_move(self, player: Player, piece: Piece, from_pos: Pos, to_pos: Pos) -> bool:
         valid, positions = self.validate_select(player, piece, from_pos)
-        print(valid, positions)
         if valid:
             return True
         start_pos, end_pos = positions

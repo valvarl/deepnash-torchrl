@@ -22,11 +22,11 @@ def basic_test():
     start_time = time.time()
     count = 0
     games = 0
-    while time.time() - start_time < 60:
+    while time.time() - start_time < 300:
         action = env.action_space.sample()
         state, reward, terminated, truncated, info = env.step(action)
-        # env.render()
-        # time.sleep(0.1)
+        env.render()
+        time.sleep(0.1)
         count += 1
         if terminated:
             games += 1
@@ -57,7 +57,7 @@ def two_square_test():
     env.render()
     time.sleep(1)
 
-    env.step((7, 0))
+    env.step((5, 0))
     env.step((6, 0))
 
     env.render()
@@ -70,7 +70,7 @@ def two_square_test():
     time.sleep(1)
 
     env.step((6, 0))
-    env.step((7, 0))
+    env.step((5, 0))
 
     env.render()
     time.sleep(1)
@@ -81,7 +81,7 @@ def two_square_test():
     env.render()
     time.sleep(1)
 
-    env.step((7, 0))
+    env.step((5, 0))
     env.step((6, 0))
 
     env.render()
@@ -89,23 +89,6 @@ def two_square_test():
 
     env.step((5, 0))
     env.step((6, 0))
-
-    env.render()
-    time.sleep(1)
-
-    env.step((6, 0))
-    env.step((7, 0))
-
-    env.render()
-    time.sleep(1)
-
-    env.step((6, 0))
-    env.step((5, 0))
-
-    env.render()
-    time.sleep(1)
-
-    # print(env.p1.observed_moves[:5])
 
 
 def policy_test():
