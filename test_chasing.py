@@ -45,16 +45,25 @@ class ChasingDetector:
     
     def validate_select(self, player: Player, piece: Piece, pos: Pos, board=None) -> tuple[bool, Pos | None]:
         for chasing_move, chased_move in zip(self.chase_moves[::2], self.chase_moves[1::2]):
-            if chasing_move.player == player and chasing_move.piece == piece and chasing_move.from_pos == pos and \
-               chased_move.from_pos == self.chase_moves[-1].to_pos and self.check_chasing_condition(piece, pos, chasing_move.to_pos, board):
+            if chasing_move.player == player and chasing_move.piece == piece and \
+               chased_move.from_pos == self.chase_moves[-1].to_pos and \
+               self.check_chasing_condition(piece, pos, chasing_move.to_pos, board) and \
+               self.check_chasing_condition(piece, chasing_move.from_pos, chasing_move.to_pos, board):
+            #    ((chasing_move.from_pos[0] == chasing_move.to_pos[0] and (
+            #         chasing_move.from_pos[1] < chasing_move.to_pos[1] and pos[1] < chasing_move.to_pos[1] or 
+            #         chasing_move.from_pos[1] > chasing_move.to_pos[1] and pos[1] > chasing_move.to_pos[1])) or 
+            #     (chasing_move.from_pos[1] == chasing_move.to_pos[1] and (
+            #         chasing_move.from_pos[0] < chasing_move.to_pos[0] and pos[0] < chasing_move.to_pos[0] or 
+            #         chasing_move.from_pos[0] > chasing_move.to_pos[0] and pos[0] > chasing_move.to_pos[0]))):
                 return False, chasing_move.to_pos
         return True, None
 
-    def validate_move(self, player: Player, piece: Piece, from_pos: Pos, to_pos: Pos) -> bool:
-        for chasing_move, chased_move in zip(self.chase_moves[::2], self.chase_moves[1::2]):
-            if chasing_move.player == player and chasing_move.piece == piece and chasing_move.to_pos == to_pos and \
-               chased_move.from_pos == self.chase_moves[-1].to_pos:
-                return False
+    def validate_move(self, player: Player, piece: Piece, from_pos: Pos, to_pos: Pos, board=None) -> bool:
+        valid, position = self.validate_select(player, piece, from_pos, board)
+        if valid:
+            return True
+        if position == to_pos:
+            return False
         return True
     
     def update(self, player: Player, piece: Piece, from_pos: Pos, to_pos: Pos, board=None):
@@ -72,7 +81,7 @@ class ChasingDetector:
             opponent_pos=self.chase_moves[-1].to_pos,
             board=board
         ):
-            if not self.chase_moves[-1].attacker and not self.validate_move(player, piece, from_pos, to_pos):
+            if not self.chase_moves[-1].attacker and not self.validate_move(player, piece, from_pos, to_pos, board):
                 raise RuntimeError("")
             self.chase_moves.append(ChaseEntry(player, piece, from_pos, to_pos, attacker=not self.chase_moves[-1].attacker))
         else:
@@ -89,6 +98,7 @@ detector = ChasingDetector()
 # detector.update(Player.BLUE, Piece.SOLDIER, (1, 1), (1, 2))
 # detector.update(Player.RED, Piece.SOLDIER, (0, 1), (0, 2))
 # detector.update(Player.BLUE, Piece.SOLDIER, (1, 2), (1, 1))
+# print(detector.validate_select(Player.RED, Piece.SOLDIER, (0, 2)))
 # detector.update(Player.RED, Piece.SOLDIER, (0, 2), (0, 1))
 # detector.update(Player.BLUE, Piece.SOLDIER, (1, 1), (1, 0))
 # detector.update(Player.RED, Piece.SOLDIER, (0, 1), (0, 0))
@@ -96,6 +106,59 @@ detector = ChasingDetector()
 # print(detector.validate_select(Player.RED, Piece.SOLDIER, (0, 0)))
 # print(detector.validate_move(Player.RED, Piece.SOLDIER, (0, 0), (0, 1)))
 # detector.update(Player.RED, Piece.SOLDIER, (0, 0), (0, 1))
+
+# ..B
+# .R.
+# detector.update(Player.RED, Piece.SOLDIER, (0, 1), (0, 2))
+# detector.update(Player.BLUE, Piece.SOLDIER, (1, 2), (1, 1))
+# detector.update(Player.RED, Piece.SOLDIER, (0, 2), (0, 1))
+# detector.update(Player.BLUE, Piece.SOLDIER, (1, 1), (1, 0))
+# detector.update(Player.RED, Piece.SOLDIER, (0, 1), (0, 0))
+# detector.update(Player.BLUE, Piece.SOLDIER, (1, 0), (1, 1))
+# detector.update(Player.RED, Piece.SOLDIER, (0, 0), (0, 1))
+# detector.update(Player.BLUE, Piece.SOLDIER, (1, 1), (1, 2))
+# print(detector.validate_select(Player.RED, Piece.SOLDIER, (0, 1)))
+# print(detector.validate_move(Player.RED, Piece.SOLDIER, (0, 1), (0, 2)))
+# detector.update(Player.RED, Piece.SOLDIER, (0, 1), (0, 2))
+
+# .B.
+# ...
+# .R.
+detector.update(Player.RED, Piece.SOLDIER, (-1, 1), (0, 1))
+detector.update(Player.BLUE, Piece.SOLDIER, (1, 1), (1, 2))
+detector.update(Player.RED, Piece.SOLDIER, (0, 1), (0, 2))
+detector.update(Player.BLUE, Piece.SOLDIER, (1, 2), (1, 1))
+print(detector.validate_select(Player.RED, Piece.SOLDIER, (0, 2)))
+detector.update(Player.RED, Piece.SOLDIER, (0, 2), (0, 1))
+detector.update(Player.BLUE, Piece.SOLDIER, (1, 1), (1, 0))
+detector.update(Player.RED, Piece.SOLDIER, (0, 1), (0, 0))
+detector.update(Player.BLUE, Piece.SOLDIER, (1, 0), (1, 1))
+print(detector.validate_select(Player.RED, Piece.SOLDIER, (0, 0)))
+print(detector.validate_move(Player.RED, Piece.SOLDIER, (0, 0), (0, 1)))
+detector.update(Player.RED, Piece.SOLDIER, (0, 0), (0, 1))
+
+# L.B
+# .R.
+# ..L
+# detector.update(Player.RED, Piece.SOLDIER, (0, 0), (0, 1))
+# detector.update(Player.BLUE, Piece.SOLDIER, (1, 1), (1, 0))
+# detector.update(Player.RED, Piece.SOLDIER, (0, 1), (1, 1))
+# detector.update(Player.BLUE, Piece.SOLDIER, (1, 0), (0, 0))
+# detector.update(Player.RED, Piece.SOLDIER, (1, 1), (1, 0))
+# detector.update(Player.BLUE, Piece.SOLDIER, (0, 0), (-1, 0))
+# detector.update(Player.RED, Piece.SOLDIER, (1, 0), (0, 0))
+# detector.update(Player.BLUE, Piece.SOLDIER, (-1, 0), (-1, -1))
+# detector.update(Player.RED, Piece.SOLDIER, (0, 0), (-1, 0))
+# detector.update(Player.BLUE, Piece.SOLDIER, (-1, -1), (0, -1))
+# detector.update(Player.RED, Piece.SOLDIER, (-1, 0), (-1, -1))
+# detector.update(Player.BLUE, Piece.SOLDIER, (0, -1), (0, 0))
+# detector.update(Player.RED, Piece.SOLDIER, (-1, -1), (0, -1))
+# detector.update(Player.BLUE, Piece.SOLDIER, (0, 0), (0, 1))
+# detector.update(Player.RED, Piece.SOLDIER, (0, -1), (0, 0))
+# detector.update(Player.BLUE, Piece.SOLDIER, (0, 1), (1, 1))
+# print(detector.validate_move(Player.RED, Piece.SOLDIER, (0, 0), (0, 1)))
+# detector.update(Player.RED, Piece.SOLDIER, (0, 0), (0, 1))
+
 
 # ..B
 # .L.
