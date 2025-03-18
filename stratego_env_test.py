@@ -13,6 +13,7 @@ import numpy as np
 import time
 
 from deep_nash.agent import DeepNashAgent
+from stratego_gym.envs.primitives import Piece, Player
 
 
 def basic_test():
@@ -23,10 +24,24 @@ def basic_test():
     count = 0
     games = 0
     while time.time() - start_time < 300:
-        action = env.action_space.sample()
+        try:
+            action = env.action_space.sample()
+        except Exception:
+            print(env.board)
+            print(env.chasing_detector.chase_moves)
+            print('p1', env.two_square_detector.p1)
+            print('p2', env.two_square_detector.p2)
+            print(env.player)
+            print(env.p2.last_selected)
+            print(env.p2.last_selected_piece)
+            pos = env.two_square_detector.p2[-1][1]
+            piece = Piece(env.board[pos])
+            print(env.two_square_detector.validate_select(Player.BLUE, piece, pos))
+            print(env.valid_pieces_to_select())
+
         state, reward, terminated, truncated, info = env.step(action)
-        env.render()
-        time.sleep(0.1)
+        # env.render()
+        # time.sleep(0.1)
         count += 1
         if terminated:
             games += 1
@@ -166,6 +181,6 @@ def vectorized_test(n_procs, n_workers):
 if __name__ == '__main__':
     # vectorized_test(10, 4)
     # policy_test()
-    # basic_test()
+    basic_test()
     # rollout_test()
-    two_square_test()
+    # two_square_test()

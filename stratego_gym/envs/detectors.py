@@ -73,7 +73,7 @@ class ChasingDetector:
             board=board
         ):
             # chase continues
-            print(from_pos if self.chase_moves[-1].attacker else to_pos, self.chase_moves[-1])
+            # print(from_pos if self.chase_moves[-1].attacker else to_pos, self.chase_moves[-1])
             if not self.chase_moves[-1].attacker and not self.validate_move(player, piece, from_pos, to_pos, board):
                 raise RuntimeError("")
             self.chase_moves.append(ChaseEntry(player, piece, from_pos, to_pos, attacker=not self.chase_moves[-1].attacker))
