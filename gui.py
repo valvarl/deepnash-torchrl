@@ -5,11 +5,13 @@ import numpy as np
 from stratego_gym.envs.primitives import Piece, Player
 from stratego_gym.envs.startego import WINDOW_SIZE, GamePhase
 
+from config_test import scout_config
+
 def play_with_mouse():
-    env = gym.make("stratego_gym/Stratego-v0", render_mode="human")
+    env = gym.make("stratego_gym/Stratego-v0", config=scout_config, render_mode="human")
     env.reset()
 
-    for i in range(80):
+    for i in range(2):
         action = env.action_space.sample()
         state, reward, terminated, truncated, info = env.step(action)
 

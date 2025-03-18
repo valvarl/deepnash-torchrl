@@ -183,8 +183,10 @@ class StrategoEnv(Env):
             action_mask = self.valid_spots_to_place()
         elif self.game_phase == GamePhase.SELECT:
             action_mask = self.valid_pieces_to_select()
+            print(self.chasing_detector.chase_moves)
         else:
             action_mask = self.valid_destinations()
+            print('MOVE\n', action_mask)
         self.action_space.set_mask(action_mask.astype(bool))
         return {"obs": obs, "action_mask": action_mask}
     
@@ -349,7 +351,11 @@ class StrategoEnv(Env):
         other_player_moves[0] = np.rot90(move, 2) * -1
 
         self.two_square_detector.update(self.player, Piece(selected_piece), source, dest)
-        self.chasing_detector.update(self.player, Piece(selected_piece), source, dest, self.board)
+        _source, _dest = source, dest
+        if self.player == Player.BLUE:
+            _source = (self.height - source[0] - 1, self.width - source[1] - 1)
+            _dest = (self.height - dest[0] - 1, self.width - dest[1] - 1)
+        self.chasing_detector.update(self.player, Piece(selected_piece), _source, _dest, self.board)
 
         # Perform Move Logic
         cur_player_public_info = self.p1.public_obs_info if self.player == Player.RED else self.p2.public_obs_info
@@ -466,7 +472,11 @@ class StrategoEnv(Env):
         if not self.two_square_detector.validate_move(self.player, Piece(selected_piece), src, dest):
             return False, f"Two-square rule violation: {self.two_square_detector.get_player(self.player)}"
         
-        if not self.chasing_detector.validate_move(self.player, Piece(selected_piece), src, dest, self.board):
+        _src, _dest = src, dest
+        if self.player == Player.BLUE:
+            _src = (self.height - src[0] - 1, self.width - src[1] - 1)
+            _dest = (self.height - dest[0] - 1, self.width - dest[1] - 1)
+        if not self.chasing_detector.validate_move(self.player, Piece(selected_piece), _src, _dest, self.board):
             return False, f"More-square rule violation: {self.chasing_detector.chase_moves}"
 
         return True, "Valid Action"
@@ -496,7 +506,10 @@ class StrategoEnv(Env):
         if pos is not None:
             board = self.board if not is_other_player else np.rot90(self.board, 2)
             valid_two_square, pos_twosq = self.two_square_detector.validate_select(player, piece, pos)
-            valid_chasing, pos_chasing = self.chasing_detector.validate_select(player, piece, pos, board)
+            _pos = pos
+            if player == Player.BLUE:
+                _pos = (self.height - pos[0] - 1, self.width - pos[1] - 1)
+            valid_chasing, pos_chasing = self.chasing_detector.validate_select(player, piece, _pos, board)
             if not (valid_two_square and valid_chasing):
                 mask = np.zeros((self.height, self.width), dtype=bool)
                 if not valid_two_square:
@@ -505,18 +518,20 @@ class StrategoEnv(Env):
                         mask[start_pos] = False
                     else:
                         if start_pos[0] == end_pos[0]:
-                            mask[start_pos[0], min(start_pos[1], end_pos[1]) + 1: max(start_pos[1], end_pos[1])] = True
+                            mask[start_pos[0], min(start_pos[1], end_pos[1]): max(start_pos[1], end_pos[1]) + 1] = True
                         else:
-                            mask[min(start_pos[0], end_pos[0]) + 1: max(start_pos[0], end_pos[0]), start_pos[1]] = True
+                            mask[min(start_pos[0], end_pos[0]): max(start_pos[0], end_pos[0]) + 1, start_pos[1]] = True
                 
                 if not valid_chasing:
-                    mask[pos_chasing] = False
+                    for _pos in pos_chasing:
+                        if player == Player.BLUE:
+                            _pos = (self.height - pos[0] - 1, self.width - pos[1] - 1)
+                        mask[_pos] = False
                 
                 surrounded_square = 0
                 for i, j in zip([-1, 1, 0, 0], [0, 0, -1, 1]):
-                    _pos = pos
+                    _pos = (pos[0] + i, pos[1] + j)
                     while 0 <= _pos[0] < self.height and 0 <= _pos[1] < self.width:
-                        _pos = (_pos[0] + i, _pos[1] + j)
                         if not is_other_player:
                             if not mask[_pos]:
                                 if board[_pos] >= Piece.LAKE.value:
@@ -529,6 +544,7 @@ class StrategoEnv(Env):
                                 break
                         if piece != Piece.SCOUT:
                             break
+                        _pos = (_pos[0] + i, _pos[1] + j)
                     else:
                         if _pos[0] < 0 or _pos[0] >= self.height:
                             surrounded_square += 1
@@ -560,15 +576,21 @@ class StrategoEnv(Env):
                 two_square_mask[start_pos] = False
             else:
                 if start_pos[0] == end_pos[0]:
-                    two_square_mask[start_pos[0], min(start_pos[1], end_pos[1]) + 1: max(start_pos[1], end_pos[1])] = False
+                    two_square_mask[start_pos[0], min(start_pos[1], end_pos[1]): max(start_pos[1], end_pos[1]) + 1] = False
                 else:
-                    two_square_mask[min(start_pos[0], end_pos[0]) + 1: max(start_pos[0], end_pos[0]), start_pos[1]] = False
+                    two_square_mask[min(start_pos[0], end_pos[0]): max(start_pos[0], end_pos[0]) + 1, start_pos[1]] = False
 
         chasing_mask = None
-        valid, position = self.chasing_detector.validate_select(self.player, Piece(selected_piece_val), selected, self.board)
+        _selected = selected
+        if self.player == Player.BLUE:
+            _selected = (self.height - selected[0] - 1, self.width - selected[1] - 1)
+        valid, position = self.chasing_detector.validate_select(self.player, Piece(selected_piece_val), _selected, self.board)
         if not valid:
             chasing_mask = np.ones((self.height, self.width), dtype=bool)
-            chasing_mask[position] = False
+            for _pos in position:
+                if self.player == Player.BLUE:
+                    _pos = (self.height - _pos[0] - 1, self.width - _pos[1] - 1)
+                chasing_mask[_pos] = False
 
         if selected_piece_val == Piece.SCOUT.value:
             for direction in directions.T:

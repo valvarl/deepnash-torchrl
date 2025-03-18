@@ -30,25 +30,25 @@ class ChasingDetector:
         else:
             return self.is_on_same_line(verified_pos, opponent_pos, board)
     
-    def validate_select(self, player: Player, piece: Piece, pos: Pos, board=None) -> tuple[bool, Pos | None]:
+    def validate_select(self, player: Player, piece: Piece, pos: Pos, board=None) -> tuple[bool, list[Pos] | None]:
         if not self.chase_moves or self.chase_moves[-1].attacker:
             return True, None
+        forbidden = []
         for i, (chasing_move, chased_move) in enumerate(zip(self.chase_moves[::2], self.chase_moves[1::2])):
             if chasing_move.player == player and chasing_move.piece == piece and \
                chased_move.from_pos == self.chase_moves[-1].to_pos and \
-               self.check_chasing_condition(piece, pos, chasing_move.to_pos, board) and \
-               self.check_chasing_condition(piece, chasing_move.from_pos, chasing_move.to_pos, board):
-                if len(self.chase_moves) > 1 and (len(self.chase_moves) - 1) // 2 == i + 1 and self.chase_moves[-2].from_pos == chasing_move.to_pos:
-                    return True, None
+               self.check_chasing_condition(piece, pos, chasing_move.to_pos, board):
+                if (len(self.chase_moves) - 1) // 2 == i + 1 and self.chase_moves[-2].from_pos == chasing_move.to_pos:
+                    continue
                 else:
-                    return False, chasing_move.to_pos
-        return True, None
+                    forbidden.append(chasing_move.to_pos)
+        return (True, None) if not forbidden else (False, forbidden)
 
     def validate_move(self, player: Player, piece: Piece, from_pos: Pos, to_pos: Pos, board=None) -> bool:
-        valid, position = self.validate_select(player, piece, from_pos, board)
+        valid, forbidden = self.validate_select(player, piece, from_pos, board)
         if valid:
             return True
-        if position == to_pos:
+        if to_pos in forbidden:
             return False
         return True
     
@@ -58,8 +58,13 @@ class ChasingDetector:
             return
         
         if len(self.chase_moves) > 1 and self.chase_moves[-2].to_pos != from_pos:
+            # selection of a figure not involved in chasing
             self.chase_moves = self.chase_moves[-1:]
             self.chase_moves[-1:][0].attacker = True
+        elif self.chase_moves[-1].attacker and self.check_chasing_condition(piece, to_pos, self.chase_moves[-1].to_pos, board):
+            # initiative handover
+            self.chase_moves = [ChaseEntry(player, piece, from_pos, to_pos)]
+            return
 
         if self.check_chasing_condition(
             verified_piece=self.chase_moves[-1].piece if self.chase_moves[-1].attacker else piece, 
@@ -67,12 +72,13 @@ class ChasingDetector:
             opponent_pos=self.chase_moves[-1].to_pos,
             board=board
         ):
+            # chase continues
+            print(from_pos if self.chase_moves[-1].attacker else to_pos, self.chase_moves[-1])
             if not self.chase_moves[-1].attacker and not self.validate_move(player, piece, from_pos, to_pos, board):
                 raise RuntimeError("")
             self.chase_moves.append(ChaseEntry(player, piece, from_pos, to_pos, attacker=not self.chase_moves[-1].attacker))
         else:
             self.chase_moves = [ChaseEntry(player, piece, from_pos, to_pos)]
-        # print(self.chase_moves)
 
 
 class TwoSquareDetector:
