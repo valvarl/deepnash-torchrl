@@ -266,6 +266,11 @@ class StrategoEnv(Env):
                     return self.generate_env_state(), 0, False, False, self.get_info()
 
             if self.p1.deploy_idx == self.p1.unrevealed.sum() and self.p2.deploy_idx == self.p2.unrevealed.sum():
+                if np.sum(self.board >= Piece.SPY.value) == 0 or self.valid_pieces_to_select().sum() == 0:
+                    draw_game = (np.sum(self.board <= -Piece.SPY.value) == 0) or self.valid_pieces_to_select(is_other_player=True).sum() == 0
+                    self.game_phase = GamePhase.TERMINAL
+                    return self.generate_env_state(), 0 if draw_game else 1, True, False, self.get_info()
+
                 self.game_phase = GamePhase.SELECT
                 if self.player == Player.RED:
                     self.p1.public_obs_info[0, self.board * self.p1.deploy_mask > 0] = 1
@@ -408,9 +413,10 @@ class StrategoEnv(Env):
         # Check if any pieces can be moved. If one player has no movable pieces, the other player wins.
         # If both players have no movable pieces, the game is a draw.
         if not terminated and (np.sum(self.board >= Piece.SPY.value) == 0 or self.valid_pieces_to_select().sum() == 0):
-            # print(self.valid_pieces_to_select(is_other_player=True))
-            print('HELLO CHECK TERMINATED')
+            # print('HELLO CHECK TERMINATED', self.player, (np.sum(self.board >= Piece.SPY.value) == 0))
             draw_game = (np.sum(self.board <= -Piece.SPY.value) == 0) or self.valid_pieces_to_select(is_other_player=True).sum() == 0
+            # print(f'MASK {self.player}\n', self.valid_pieces_to_select(is_other_player=True))
+            # print('MASK\n', self.valid_pieces_to_select(is_other_player=True))
             self.game_phase = GamePhase.TERMINAL
             return self.generate_env_state(), 0 if draw_game else 1, True, False, self.get_info()
 
@@ -488,7 +494,8 @@ class StrategoEnv(Env):
         return (self.board == Piece.EMPTY.value) & deploy_mask
 
     def valid_pieces_to_select(self, is_other_player=False) -> np.ndarray:
-        padded_board = np.pad(self.board, 1, constant_values=Piece.LAKE.value)
+        board = self.board if not is_other_player else np.rot90(self.board, 2) * -1
+        padded_board = np.pad(board, 1, constant_values=Piece.LAKE.value)
         padded_board[padded_board == -Piece.LAKE.value] = Piece.LAKE.value
 
         # Shift the padded array in all four directions
@@ -498,63 +505,63 @@ class StrategoEnv(Env):
         shift_down = np.roll(padded_board, -1, axis=0)[1:-1, 1:-1]
 
         # Check conditions to create the boolean array
-        surrounded = (shift_left >= Piece.LAKE.value) & (shift_right >= Piece.LAKE.value) & (shift_up >= Piece.LAKE.value) & (
-                 shift_down >= Piece.LAKE.value)
+        surrounded = (shift_left >= Piece.LAKE.value) & (shift_right >= Piece.LAKE.value) & \
+                     (shift_up >= Piece.LAKE.value) & (shift_down >= Piece.LAKE.value)
         
         # Two-square and More-square rules
         player = self.player if not is_other_player else Player(-1 * self.player.value)
         p = self.p1 if player == Player.RED else self.p2
         pos, piece = p.last_selected, p.last_selected_piece
-        if pos is not None:
-            board = self.board if not is_other_player else np.rot90(self.board, 2) * -1
-            valid_two_square, pos_twosq = self.two_square_detector.validate_select(player, piece, pos)
-            _pos = pos
-            if player == Player.BLUE:
-                _pos = (self.height - pos[0] - 1, self.width - pos[1] - 1)
-            valid_chasing, pos_chasing = self.chasing_detector.validate_select(player, piece, _pos, board)
-            if not (valid_two_square and valid_chasing):
-                mask = np.zeros((self.height, self.width), dtype=bool)
-                if not valid_two_square:
-                    start_pos, end_pos = pos_twosq
-                    if start_pos == end_pos:
-                        mask[start_pos] = True
+        if pos is None:
+            return np.logical_and(self.board >= Piece.SPY.value, ~surrounded).astype(int)
+        
+        valid_two_square, pos_twosq = self.two_square_detector.validate_select(player, piece, pos)
+        _pos = pos if player == Player.RED else (self.height - pos[0] - 1, self.width - pos[1] - 1)
+        valid_chasing, pos_chasing = self.chasing_detector.validate_select(player, piece, _pos, board)
+        
+        if not (valid_two_square and valid_chasing):
+            mask = np.zeros((self.height, self.width), dtype=bool)
+            if not valid_two_square:
+                start_pos, end_pos = pos_twosq
+                if start_pos == end_pos:
+                    mask[start_pos] = True
+                else:
+                    if start_pos[0] == end_pos[0]:
+                        mask[start_pos[0], min(start_pos[1], end_pos[1]): max(start_pos[1], end_pos[1]) + 1] = True
                     else:
-                        if start_pos[0] == end_pos[0]:
-                            mask[start_pos[0], min(start_pos[1], end_pos[1]): max(start_pos[1], end_pos[1]) + 1] = True
-                        else:
-                            mask[min(start_pos[0], end_pos[0]): max(start_pos[0], end_pos[0]) + 1, start_pos[1]] = True
-                
-                if not valid_chasing:
-                    for _pos in pos_chasing:
-                        if player == Player.BLUE:
-                            _pos = (self.height - pos[0] - 1, self.width - pos[1] - 1)
-                        mask[_pos] = True
+                        mask[min(start_pos[0], end_pos[0]): max(start_pos[0], end_pos[0]) + 1, start_pos[1]] = True
+            
+            if not valid_chasing:
+                for _pos in pos_chasing:
+                    if player == Player.BLUE:
+                        _pos = (self.height - pos[0] - 1, self.width - pos[1] - 1)
+                    mask[_pos] = True
 
-                surrounded_square = 0
-                for i, j in zip([-1, 1, 0, 0], [0, 0, -1, 1]):
-                    _pos = (pos[0] + i, pos[1] + j)
-                    while 0 <= _pos[0] < self.height and 0 <= _pos[1] < self.width:
-                        if not mask[_pos]:
-                            if board[_pos] >= Piece.LAKE.value or board[_pos] == -Piece.LAKE.value:
-                                surrounded_square += 1
-                            break
-                        if piece != Piece.SCOUT:
-                            if mask[_pos]:
-                                surrounded_square += 1
-                            break
-                        _pos = (_pos[0] + i, _pos[1] + j)
-                    else:
-                        if _pos[0] < 0 or _pos[0] >= self.height:
+            surrounded_square = 0
+            for i, j in zip([-1, 1, 0, 0], [0, 0, -1, 1]):
+                _pos = (pos[0] + i, pos[1] + j)
+                while 0 <= _pos[0] < self.height and 0 <= _pos[1] < self.width:
+                    if not mask[_pos]:
+                        if board[_pos] >= Piece.LAKE.value or board[_pos] == -Piece.LAKE.value:
                             surrounded_square += 1
-                        elif _pos[1] < 0 or _pos[1] >= self.width:
+                        break
+                    if piece != Piece.SCOUT:
+                        if mask[_pos]:
                             surrounded_square += 1
-                
-                if surrounded_square == 4:
-                    if is_other_player:
-                        pos = (self.height - pos[0] - 1, self.width - pos[1] - 1)
-                    surrounded[pos] = True
+                        break
+                    _pos = (_pos[0] + i, _pos[1] + j)
+                else:
+                    if _pos[0] < 0 or _pos[0] >= self.height:
+                        surrounded_square += 1
+                    elif _pos[1] < 0 or _pos[1] >= self.width:
+                        surrounded_square += 1
+            
+            if surrounded_square == 4:
+                surrounded[pos] = True
 
-        return np.logical_and((self.board <= -Piece.SPY.value) if is_other_player else (self.board >= Piece.SPY.value), ~surrounded).astype(int)
+            # print(player, 'BOARD\n', board, 'MASK\n', mask, surrounded_square, 'SURROUNDED\n', surrounded)
+
+        return np.logical_and(board >= Piece.SPY.value, ~surrounded).astype(int)
 
     def valid_destinations(self):
         if self.game_phase != GamePhase.MOVE:

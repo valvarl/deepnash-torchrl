@@ -23,7 +23,7 @@ def basic_test():
     start_time = time.time()
     count = 0
     games = 0
-    while time.time() - start_time < 300:
+    while time.time() - start_time < 60:
         try:
             action = env.action_space.sample()
         except Exception:
@@ -46,6 +46,13 @@ def basic_test():
         if terminated:
             games += 1
             print(f"Game over! Player {-1 * info['cur_player']} received {reward}, game: {games}, turn: {info['total_moves']}")
+            if reward == 0 and not (env.draw_conditions['total_moves'] == 2000 or env.draw_conditions['moves_since_attack'] == 200):
+                print(env.draw_conditions)
+                print(env.board)
+                print('p1', env.two_square_detector.p1)
+                print('p2', env.two_square_detector.p2)
+                print(env.player)
+                exit()
             env.reset()
     print(count)
 

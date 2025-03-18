@@ -2,7 +2,7 @@ from stratego_gym.envs.config import StrategoConfig
 from stratego_gym.envs.primitives import Piece
 
 PIECES_NUM_SCOUT = {
-    Piece.SPY: 1,
+    Piece.SCOUT: 1,
 }
 
 PLACES_TO_DEPLOY_RED_SCOUT = [((4, 2), (4, 2)),]
