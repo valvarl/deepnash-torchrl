@@ -80,6 +80,9 @@ class ChasingDetector:
         else:
             self.chase_moves = [ChaseEntry(player, piece, from_pos, to_pos)]
 
+    def reset(self):
+        self.chase_moves.clear()
+
 
 class TwoSquareDetector:
     def __init__(self):
@@ -151,5 +154,6 @@ class TwoSquareDetector:
             p.clear()
             p.append((from_pos, to_pos))
 
-        # print('P1', self.p1)
-        # print('P2', self.p2)
+    def reset(self):
+        self.p1.clear()
+        self.p2.clear()

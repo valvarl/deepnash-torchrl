@@ -146,6 +146,9 @@ class StrategoEnv(Env):
                                      self.observed_history_entries, self.height, self.width)
         self.p2.generate_state(self.config.p2_pieces_num, self.config.p2_deploy_mask, 
                                      self.observed_history_entries, self.height, self.width)
+        
+        self.two_square_detector.reset()
+        self.chasing_detector.reset()
 
         return self.generate_env_state(), self.get_info()
         
