@@ -7,53 +7,10 @@ import numpy as np
 
 from stratego_gym.envs.primitives import Piece, Player
 from stratego_gym.envs.startego import GamePhase, StrategoEnv
-
-SCOUT_ONLY = {
-    Piece.SCOUT: 1,
-}
-
-SPY_ONLY = {
-    Piece.SPY: 1,
-}
-
-SCOUT_PAIR = {
-    Piece.SCOUT: 2,
-}
-
-SPY_PAIR = {
-    Piece.SPY: 2,
-}
-
-def move_fwd(env, from_pos, to_pos):
-    env.step(from_pos)
-    env.step(to_pos)
-
-def move_bwd(env, from_pos, to_pos):
-    env.step(to_pos)
-    env.step(from_pos)
-
-def repeat_twice(fn, *args, **kwargs):
-    fn(*args, **kwargs)
-    fn(*args, **kwargs)
-
-def rotate_pos(pos, height, width):
-    return (height - pos[0] - 1, width - pos[1] - 1)
-
-def validate_move(env, piece, from_pos, to_pos, maybe_occupied=False):
-    from_pos_opponent = rotate_pos(from_pos, env.height, env.width)
-    to_pos_opponent = rotate_pos(to_pos, env.height, env.width)
-    for fp in (from_pos, from_pos_opponent):
-        assert Piece(env.board[fp]) == Piece.EMPTY
-    try:
-        assert Piece(env.board[to_pos]) == piece
-    except ValueError as e:
-        if not maybe_occupied:
-            raise e
-    try:
-        assert Piece(-env.board[to_pos_opponent]) == piece
-    except ValueError as e:
-        if not maybe_occupied:
-            raise e
+from tests.env.utils import (
+    SCOUT_ONLY, SCOUT_PAIR, SPY_ONLY, SPY_PAIR, 
+    move_bwd, move_fwd, repeat_twice, validate_move,
+)
 
 @pytest.mark.parametrize(
     "pices,from_pos", 
@@ -176,8 +133,8 @@ def test_no_violation_square_movement(env_5x5: Callable[[Any], StrategoEnv], pic
                 assert len(env.two_square_detector.p1) == 1
                 assert len(env.two_square_detector.p2) == 1
                 _from_pos = to_pos
-            np.roll(move_direction1, 1)
-            np.roll(move_direction2, 1)
+            move_direction1 = np.roll(move_direction1, 1)
+            move_direction2 = np.roll(move_direction2, 1)
         move_direction1, move_direction2 = move_direction2, move_direction1
 
 

@@ -87,25 +87,6 @@ detector.update(Player.RED, Piece.SPY, (0, 0), (0, 1))
 # print(detector.validate_move(Player.RED, Piece.SPY, (0, 0), (0, 1)))
 # detector.update(Player.RED, Piece.SPY, (0, 0), (0, 1))
 
-# ..B
-# .L.
-# R..
-# board = np.zeros((3, 3))
-# board[1, 1] = 1
-# detector.update(Player.RED, Piece.SCOUT, (0, 0), (0, 2), board)
-# detector.update(Player.BLUE, Piece.SCOUT, (2, 2), (2, 0), board)
-# detector.update(Player.RED, Piece.SCOUT, (0, 2), (2, 2), board)
-# detector.update(Player.BLUE, Piece.SCOUT, (2, 0), (0, 0), board)
-# detector.update(Player.RED, Piece.SCOUT, (2, 2), (2, 0), board)
-# detector.update(Player.BLUE, Piece.SCOUT, (0, 0), (0, 2), board)
-# detector.update(Player.RED, Piece.SCOUT, (2, 0), (0, 0), board)
-# detector.update(Player.BLUE, Piece.SCOUT, (0, 2), (2, 2), board)
-# print(detector.chase_moves)
-# print(detector.validate_select(Player.RED, Piece.SCOUT, (0, 0), board))
-# print(detector.validate_move(Player.RED, Piece.SCOUT, (0, 0), (0, 2), board))
-# detector.update(Player.RED, Piece.SCOUT, (0, 0), (0, 2), board)
-# print(detector.chase_moves)
-
 # ...
 # ...
 # R.B
