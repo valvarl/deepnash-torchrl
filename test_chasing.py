@@ -5,66 +5,6 @@ from stratego_gym.envs.primitives import Player, Piece
 
 detector = ChasingDetector()
 
-# .B.
-# R..
-detector.update(Player.RED, Piece.SPY, (0, 0), (0, 1))
-detector.update(Player.BLUE, Piece.SPY, (1, 1), (1, 2))
-detector.update(Player.RED, Piece.SPY, (0, 1), (0, 2))
-detector.update(Player.BLUE, Piece.SPY, (1, 2), (1, 1))
-print(detector.validate_select(Player.RED, Piece.SPY, (0, 2)))
-detector.update(Player.RED, Piece.SPY, (0, 2), (0, 1))
-detector.update(Player.BLUE, Piece.SPY, (1, 1), (1, 0))
-detector.update(Player.RED, Piece.SPY, (0, 1), (0, 0))
-detector.update(Player.BLUE, Piece.SPY, (1, 0), (1, 1))
-print(detector.validate_select(Player.RED, Piece.SPY, (0, 0)))
-print(detector.validate_move(Player.RED, Piece.SPY, (0, 0), (0, 1)))
-detector.update(Player.RED, Piece.SPY, (0, 0), (0, 1))
-
-# ..B
-# .R.
-# detector.update(Player.RED, Piece.SPY, (0, 1), (0, 2))
-# detector.update(Player.BLUE, Piece.SPY, (1, 2), (1, 1))
-# detector.update(Player.RED, Piece.SPY, (0, 2), (0, 1))
-# detector.update(Player.BLUE, Piece.SPY, (1, 1), (1, 0))
-# detector.update(Player.RED, Piece.SPY, (0, 1), (0, 0))
-# detector.update(Player.BLUE, Piece.SPY, (1, 0), (1, 1))
-# detector.update(Player.RED, Piece.SPY, (0, 0), (0, 1))
-# detector.update(Player.BLUE, Piece.SPY, (1, 1), (1, 2))
-# print(detector.validate_select(Player.RED, Piece.SPY, (0, 1)))
-# print(detector.validate_move(Player.RED, Piece.SPY, (0, 1), (0, 2)))
-# detector.update(Player.RED, Piece.SPY, (0, 1), (0, 2))
-
-# ..B
-# .R.
-# detector.update(Player.RED, Piece.SPY, (0, 1), (0, 2))
-# detector.update(Player.BLUE, Piece.SPY, (1, 2), (1, 1))
-# detector.update(Player.RED, Piece.SPY, (0, 2), (0, 1))
-# detector.update(Player.BLUE, Piece.SPY, (1, 1), (1, 2))
-# detector.update(Player.RED, Piece.SPY, (0, 1), (0, 2))
-# detector.update(Player.BLUE, Piece.SPY, (1, 2), (1, 1))
-# detector.update(Player.RED, Piece.SPY, (0, 2), (0, 1))
-# detector.update(Player.BLUE, Piece.SPY, (1, 1), (1, 0))
-# detector.update(Player.RED, Piece.SPY, (0, 1), (0, 0))
-# detector.update(Player.BLUE, Piece.SPY, (1, 0), (1, 1))
-# detector.update(Player.RED, Piece.SPY, (0, 0), (0, 1))
-
-
-# .B.
-# ...
-# .R.
-# detector.update(Player.RED, Piece.SPY, (-1, 1), (0, 1))
-# detector.update(Player.BLUE, Piece.SPY, (1, 1), (1, 2))
-# detector.update(Player.RED, Piece.SPY, (0, 1), (0, 2))
-# detector.update(Player.BLUE, Piece.SPY, (1, 2), (1, 1))
-# print(detector.validate_select(Player.RED, Piece.SPY, (0, 2)))
-# detector.update(Player.RED, Piece.SPY, (0, 2), (0, 1))
-# detector.update(Player.BLUE, Piece.SPY, (1, 1), (1, 0))
-# detector.update(Player.RED, Piece.SPY, (0, 1), (0, 0))
-# detector.update(Player.BLUE, Piece.SPY, (1, 0), (1, 1))
-# print(detector.validate_select(Player.RED, Piece.SPY, (0, 0)))
-# print(detector.validate_move(Player.RED, Piece.SPY, (0, 0), (0, 1)))
-# detector.update(Player.RED, Piece.SPY, (0, 0), (0, 1))
-
 # L.B
 # .R.
 # ..L

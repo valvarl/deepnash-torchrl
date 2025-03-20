@@ -1,4 +1,4 @@
-
+from __future__ import annotations
 
 from collections.abc import Iterable
 from enum import Enum
@@ -50,8 +50,8 @@ class StrategoConfig:
         self,
         height: int,
         width: int,
-        p1_pieces_num: dict[Piece, int],
-        p2_pieces_num: dict[Piece, int] | None = None,
+        p1_pieces: dict[Piece, int],
+        p2_pieces: dict[Piece, int] | None = None,
         lakes: Iterable[tuple[Pos, Pos]] | None = None,
         p1_places_to_deploy: Iterable[tuple[Pos, Pos]] | None = None,
         p2_places_to_deploy: Iterable[tuple[Pos, Pos]] | None = None,
@@ -69,11 +69,14 @@ class StrategoConfig:
 
         self.p1_deploy_mask = self._resolve_mask(p1_places_to_deploy, p1_deploy_mask)        
         self.p2_deploy_mask = self._resolve_mask(p2_places_to_deploy, p2_deploy_mask)
-    
-        self.p1_pieces_num = self._pieces_to_array(p1_pieces_num)
-        if p2_pieces_num is not None:
-            self.p2_pieces_num = self._pieces_to_array(p2_pieces_num)
+
+        self.p1_pieces = p1_pieces
+        self.p1_pieces_num = self._pieces_to_array(p1_pieces)
+        if p2_pieces is not None:
+            self.p2_pieces = p2_pieces
+            self.p2_pieces_num = self._pieces_to_array(p2_pieces)
         else:
+            self.p2_pieces = p1_pieces.copy()
             self.p2_pieces_num = self.p1_pieces_num.copy()
 
         self.allowed_pieces = np.arange(len(self.p1_pieces_num))[(self.p1_pieces_num != 0) | (self.p2_pieces_num != 0)]
@@ -92,7 +95,23 @@ class StrategoConfig:
             raise ValueError(msg)
         
         self.game_mode = game_mode
-        
+
+    def rot90(self, k: int = 1) -> StrategoConfig:
+        return StrategoConfig(
+            height=self.height if k % 2 == 0 else self.width,
+            width=self.width if k % 2 == 0 else self.heigh,
+            p1_pieces=self.p1_pieces,
+            p2_pieces=self.p2_pieces,
+            p1_deploy_mask=np.rot90(self.p1_deploy_mask, k),
+            p2_deploy_mask=np.rot90(self.p2_deploy_mask, k),
+            lakes_mask=np.rot90(self.lakes_mask, k),
+            total_moves_limit=self.total_moves_limit,
+            moves_since_attack_limit=self.moves_since_attack_limit,
+            observed_history_entries=self.observed_history_entries,
+            allow_competitive_deploy=self.allow_competitive_deploy,
+            game_mode=self.game_mode,
+        )
+
     def _resolve_mask(self, positions: Iterable[tuple[Pos, Pos]] | None, mask: np.ndarray | None) -> np.ndarray:
         mask_resolved, valid, msg = None, False, ""
         if positions is None and mask is None:
@@ -166,7 +185,7 @@ class StrategoConfig:
             return cls(
                 height=10,
                 width=10,
-                p1_pieces_num=PIECES_NUM_ORIGINAL,
+                p1_pieces=PIECES_NUM_ORIGINAL,
                 p1_places_to_deploy=PLACES_TO_DEPLOY_RED_ORIGINAL,
                 p2_places_to_deploy=PLACES_TO_DEPLOY_BLUE_ORIGINAL,
                 lakes=LAKES_ORIGINAL,
@@ -175,7 +194,7 @@ class StrategoConfig:
             return cls(
                 height=10,
                 width=10,
-                p1_pieces_num=PIECES_NUM_ORIGINAL,
+                p1_pieces=PIECES_NUM_ORIGINAL,
                 p1_places_to_deploy=PLACES_TO_DEPLOY_RED_ORIGINAL,
                 p2_places_to_deploy=PLACES_TO_DEPLOY_BLUE_ORIGINAL,
                 lakes=LAKES_ORIGINAL,

@@ -25,7 +25,7 @@ def env_5x5():
         config = StrategoConfig(
             height=5,
             width=5,
-            p1_pieces_num=pieces_num,
+            p1_pieces=pieces_num,
             p1_places_to_deploy=PLACES_TO_DEPLOY_RED_5x5,
             p2_places_to_deploy=PLACES_TO_DEPLOY_BLUE_5x5,
             lakes=lakes,
@@ -41,7 +41,7 @@ def env_10x10():
         config = StrategoConfig(
             height=10,
             width=10,
-            p1_pieces_num=pieces_num,
+            p1_pieces=pieces_num,
             p1_places_to_deploy=PLACES_TO_DEPLOY_RED_ORIGINAL,
             p2_places_to_deploy=PLACES_TO_DEPLOY_BLUE_ORIGINAL,
             lakes=lakes,

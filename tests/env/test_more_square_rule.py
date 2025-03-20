@@ -103,54 +103,73 @@ def test_scout_circle_chasing_two_step(env_5x5: Callable[[Any], StrategoEnv]):
 )
 def test_three_square_chasing_opposition(env_5x5: Callable[[Any], StrategoEnv], pieces, red_from_col, red_attacker: bool):
     env = env_5x5(pieces, lakes=[])
-    
-    move_direction = np.array([-1, -1, 1, 1])
-    for _ in range(4):
-        env.reset()
-        red_from_pos = (4 if red_attacker else 3, red_from_col)
-        blue_from_pos = (4, env.width - red_from_col - 1)
-        env.step(red_from_pos)
-        env.step(blue_from_pos)
-        piece = Piece(env.board[red_from_pos])
-        assert piece.value > Piece.LAKE.value
-        assert env.game_phase == GamePhase.SELECT
-        red_to_pos = (red_from_pos[0] - 1, red_from_pos[1])
-        move_fwd(env, red_from_pos, red_to_pos)
-        red_from_pos = red_to_pos
-        blue_to_pos = (blue_from_pos[0] - 1, blue_from_pos[1])
-        move_fwd(env, blue_from_pos, blue_to_pos)
-        blue_from_pos = blue_to_pos
+    three_square_patterns = [np.roll(np.array([-1, 1]).repeat([2, 2]), i) for i in range(4)]
+    move_directions = [np.array([-1, 1]).repeat([rep, rep]) for rep in range(2, 5)]
+    for move_direction in move_directions:
+        for _ in range(len(move_direction)):
+            move_direction = np.roll(move_direction, 1)
+            
+            min_index = np.inf
+            for pattern in three_square_patterns:
+                pat_len = len(pattern)
+                for i in range(len(move_direction) - pat_len + 1):
+                    if np.all(move_direction[i:i + pat_len] == pattern):
+                        min_index = min(min_index, i)
+                        break
+            assert min_index != np.inf
 
-        if red_attacker:
+            env.reset()
+            red_from_pos = (4 if red_attacker else 3, red_from_col)
+            blue_from_pos = (4, env.width - red_from_col - 1)
+            env.step(red_from_pos)
+            env.step(blue_from_pos)
+            piece = Piece(env.board[red_from_pos])
+            assert piece.value > Piece.LAKE.value
+            assert env.game_phase == GamePhase.SELECT
             red_to_pos = (red_from_pos[0] - 1, red_from_pos[1])
             move_fwd(env, red_from_pos, red_to_pos)
             red_from_pos = red_to_pos
+            blue_to_pos = (blue_from_pos[0] - 1, blue_from_pos[1])
+            move_fwd(env, blue_from_pos, blue_to_pos)
+            blue_from_pos = blue_to_pos
 
-        for direction in move_direction:
-            blue_to_pos = (blue_to_pos[0], blue_to_pos[1] + int(direction))
-            if blue_to_pos[0] < 0 or env.height <= blue_to_pos[0] or \
-                blue_to_pos[1] < 0 or env.width <= blue_to_pos[1] or \
-                env.lakes[blue_to_pos]:
-                break
-            red_to_pos = (red_to_pos[0], red_to_pos[1] - int(direction))
-            if red_to_pos[0] < 0 or env.height <= red_to_pos[0] or \
-                red_to_pos[1] < 0 or env.width <= red_to_pos[1] or \
-                env.lakes[red_to_pos]:
-                break
             if red_attacker:
-                move_fwd(env, blue_from_pos, blue_to_pos)
-                blue_from_pos = blue_to_pos
-                if len(env.chasing_detector.chase_moves) == 8:
-                    assert not env.chasing_detector.validate_move(Player.RED, piece, red_from_pos, red_to_pos, env.board)
+                red_to_pos = (red_from_pos[0] - 1, red_from_pos[1])
                 move_fwd(env, red_from_pos, red_to_pos)
                 red_from_pos = red_to_pos
-            else:
-                move_fwd(env, red_from_pos, red_to_pos)
-                red_from_pos = red_to_pos
-                if len(env.chasing_detector.chase_moves) == 8:
-                    assert not env.chasing_detector.validate_move(Player.BLUE, piece, rotate_pos(blue_from_pos, 5, 5), rotate_pos(blue_to_pos, 5, 5), env.board)
-                move_fwd(env, blue_from_pos, blue_to_pos)
-                blue_from_pos = blue_to_pos
 
-        move_direction = np.roll(move_direction, 1)
-                
+            for direction in move_direction:
+                invalid_move = False
+                assert_passed = False
+                blue_to_pos = (blue_to_pos[0], blue_to_pos[1] + int(direction))
+                if blue_to_pos[0] < 0 or env.height <= blue_to_pos[0] or \
+                    blue_to_pos[1] < 0 or env.width <= blue_to_pos[1] or \
+                    env.lakes[blue_to_pos]:
+                    invalid_move = True
+                    break
+                red_to_pos = (red_to_pos[0], red_to_pos[1] - int(direction))
+                if red_to_pos[0] < 0 or env.height <= red_to_pos[0] or \
+                    red_to_pos[1] < 0 or env.width <= red_to_pos[1] or \
+                    env.lakes[red_to_pos]:
+                    invalid_move = True
+                    break
+                if red_attacker:
+                    move_fwd(env, blue_from_pos, blue_to_pos)
+                    blue_from_pos = blue_to_pos
+                    if len(env.chasing_detector.chase_moves) == 2 * min_index + 8:
+                        assert not env.chasing_detector.validate_move(Player.RED, piece, red_from_pos, red_to_pos, env.board)
+                        assert_passed = True
+                        break
+                    move_fwd(env, red_from_pos, red_to_pos)
+                    red_from_pos = red_to_pos
+                else:
+                    move_fwd(env, red_from_pos, red_to_pos)
+                    red_from_pos = red_to_pos
+                    if len(env.chasing_detector.chase_moves) == 2 * min_index + 8:
+                        assert not env.chasing_detector.validate_move(Player.BLUE, piece, rotate_pos(blue_from_pos, 5, 5), rotate_pos(blue_to_pos, 5, 5), env.board)
+                        assert_passed = True
+                        break
+                    move_fwd(env, blue_from_pos, blue_to_pos)
+                    blue_from_pos = blue_to_pos
+            
+            assert invalid_move or assert_passed
