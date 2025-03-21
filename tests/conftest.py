@@ -21,14 +21,23 @@ LAKES_CAVE_5x5 = [((4, 1), (4, 1)), ((3, 0), (3, 0))]
 
 @pytest.fixture()
 def env_5x5():
-    def _env_5x5(pieces_num: dict[Piece, int], lakes=LAKES_CENTRAL_5x5) -> StrategoEnv:
+    def _env_5x5(
+        pieces_num: dict[Piece, int], 
+        lakes=LAKES_CENTRAL_5x5,
+        lakes_mask=None,
+        p1_deploy_mask=None,
+        p2_deploy_mask=None,
+    ) -> StrategoEnv:
         config = StrategoConfig(
             height=5,
             width=5,
             p1_pieces=pieces_num,
-            p1_places_to_deploy=PLACES_TO_DEPLOY_RED_5x5,
-            p2_places_to_deploy=PLACES_TO_DEPLOY_BLUE_5x5,
-            lakes=lakes,
+            p1_places_to_deploy=PLACES_TO_DEPLOY_RED_5x5 if p1_deploy_mask is None else None,
+            p2_places_to_deploy=PLACES_TO_DEPLOY_BLUE_5x5 if p2_deploy_mask is None else None,
+            lakes=lakes if lakes_mask is None else None,
+            p1_deploy_mask=p1_deploy_mask,
+            p2_deploy_mask=p2_deploy_mask,
+            lakes_mask=lakes_mask,
         )
         env = StrategoEnv(config)
         env.reset()

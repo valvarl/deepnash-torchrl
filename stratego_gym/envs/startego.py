@@ -269,8 +269,9 @@ class StrategoEnv(Env):
                     return self.generate_env_state(), 0, False, False, self.get_info()
 
             if self.p1.deploy_idx == self.p1.unrevealed.sum() and self.p2.deploy_idx == self.p2.unrevealed.sum():
-                if np.sum(self.board >= Piece.SPY.value) == 0 or self.valid_pieces_to_select().sum() == 0:
-                    draw_game = (np.sum(self.board <= -Piece.SPY.value) == 0) or self.valid_pieces_to_select(is_other_player=True).sum() == 0
+                # Player who must take the first select action is checked first
+                if np.sum(self.board <= -Piece.SPY.value) == 0 or self.valid_pieces_to_select(is_other_player=True).sum() == 0:
+                    draw_game = np.sum(self.board >= Piece.SPY.value) == 0 or self.valid_pieces_to_select().sum() == 0
                     self.game_phase = GamePhase.TERMINAL
                     return self.generate_env_state(), 0 if draw_game else 1, True, False, self.get_info()
 
@@ -516,7 +517,7 @@ class StrategoEnv(Env):
         p = self.p1 if player == Player.RED else self.p2
         pos, piece = p.last_selected, p.last_selected_piece
         if pos is None:
-            return np.logical_and(self.board >= Piece.SPY.value, ~surrounded).astype(int)
+            return np.logical_and(board >= Piece.SPY.value, ~surrounded).astype(int)
         
         valid_two_square, pos_twosq = self.two_square_detector.validate_select(player, piece, pos)
         _pos = pos if player == Player.RED else (self.height - pos[0] - 1, self.width - pos[1] - 1)

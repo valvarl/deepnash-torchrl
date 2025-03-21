@@ -18,6 +18,18 @@ SPY_PAIR = {
     Piece.SPY: 2,
 }
 
+FLAG_2BOMB_SCOUT = {
+    Piece.FLAG: 1,
+    Piece.BOMB: 2,
+    Piece.SPY: 1,
+}
+
+FLAG_2BOMB_SPY = {
+    Piece.FLAG: 1,
+    Piece.BOMB: 2,
+    Piece.SPY: 1,
+}
+
 def move_fwd(env: StrategoEnv, from_pos, to_pos):
     env.step(from_pos)
     env.step(to_pos)

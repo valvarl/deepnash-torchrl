@@ -115,9 +115,9 @@ class StrategoConfig:
     def _resolve_mask(self, positions: Iterable[tuple[Pos, Pos]] | None, mask: np.ndarray | None) -> np.ndarray:
         mask_resolved, valid, msg = None, False, ""
         if positions is None and mask is None:
-            msg = ""
+            msg = "Both 'positions' and 'mask' are None. At least one must be provided."
         elif positions is not None and mask is not None:
-            msg = ""
+            msg = "Both 'positions' and 'mask' are provided. Only one should be specified."
         elif positions is not None:
             mask_resolved = self._make_mask(positions)
             valid = True
@@ -141,24 +141,22 @@ class StrategoConfig:
     def _pieces_to_array(self, pieces_num: dict[Piece, int]) -> np.ndarray:
         pieces = np.zeros((len(Piece),), dtype=np.int64)
         for piece, num in pieces_num.items():
-            if piece.value < Piece.FLAG.value:
-                raise ValueError("")
             pieces[piece.value] = num
         return pieces
     
     def _validate(self) -> tuple[bool, str]:
         if (self.p1_deploy_mask & self.lakes_mask).any():
-            return False, ""
+            return False, "Player 1's deployment overlaps with lakes."
         elif (self.p2_deploy_mask & self.lakes_mask).any():
-            return False, ""
+            return False, "Player 2's deployment overlaps with lakes."
         
         if not self.allow_competitive_deploy:
             if (self.p1_deploy_mask & self.p2_deploy_mask).any():
-                return False, ""
+                return False, "Player 1's and Player 2's deployments overlap."
             if self.p1_deploy_mask.sum() < self.p1_pieces_num.sum():
-                return False, ""
+                return False, "Player 1 has fewer deployment spots than pieces."
             if self.p2_deploy_mask.sum() < self.p2_pieces_num.sum():
-                return False, ""
+                return False, "Player 2 has fewer deployment spots than pieces."
         
         else:
             xor = np.logical_xor(self.p1_deploy_mask, self.p2_deploy_mask)
@@ -166,18 +164,18 @@ class StrategoConfig:
             p2_own_places = (xor & self.p2_deploy_mask).sum()
             if self.p1_pieces_num.sum() - p1_own_places + self.p2_pieces_num.sum() - p2_own_places > \
             (self.p1_deploy_mask & self.p2_deploy_mask).sum():
-                return False, ""        
+                return False, "Total number of pieces exceeds available shared deployment spots."      
             
         if self.total_moves_limit <= 0:
-            return False, ""
+            return False, "Total moves limit must be greater than 0."
         
         if self.moves_since_attack_limit <= 0:
-            return False, ""
+            return False, "Moves since last attack limit must be greater than 0."
             
         if self.observed_history_entries < 0:
-            return False, ""
+            return False, "Observed history entries cannot be negative."
         
-        return True, ""
+        return True, "Validation successful."
     
     @classmethod
     def from_game_mode(cls, game_mode: GameMode):
