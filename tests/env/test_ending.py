@@ -308,6 +308,7 @@ def test_no_pieces_left(env_5x5, pieces, red_no_pieces, blue_no_pieces):
     env.step(from_pos_red)
     env.step(from_pos_blue)
 
+    assert env.game_phase == GamePhase.SELECT
     for i in range(3):
         to_pos_red = (from_pos_red[0] - 1, from_pos_red[1])
         state, reward, terminated, truncated, info = env.step(from_pos_red)
@@ -381,4 +382,142 @@ def test_no_pieces_left_on_trade(env_5x5, pieces, red_attacker):
 
     assert env.game_phase == GamePhase.TERMINAL
     assert reward == 0
+
+@pytest.mark.parametrize(
+    "pieces,red_attacker",
+    itertools.product(
+        [FLAG_2BOMB_SCOUT, FLAG_2BOMB_SPY],
+        [True, False],
+    )
+)
+def test_flag_captured(env_5x5, pieces, red_attacker):
+    """
+    bb..B
+    f....
+    ..L..
+    ....f
+    R..bb
+    """
+    env = env_5x5(pieces)
+    deploy_pos = [(3, 4), (4, 3), (4, 4)]
+    for from_pos in deploy_pos:
+        repeat_twice(env.step, from_pos)
+
+    from_pos_red = (4, 0)
+    from_pos_blue = (4, 1)
+    if not red_attacker:
+        from_pos_red = (4, 1)
+        from_pos_blue = (4, 0)
+
+    env.step(from_pos_red)
+    env.step(from_pos_blue)
+
+    assert env.game_phase == GamePhase.SELECT
+    for i in range(3):
+        to_pos_red = (from_pos_red[0] - 1, from_pos_red[1])
+        state, reward, terminated, truncated, info = env.step(from_pos_red)
+        state, reward, terminated, truncated, info = env.step(to_pos_red)
+        from_pos_red = to_pos_red
+
+        if i == 2 and red_attacker:
+            break
+
+        to_pos_blue = (from_pos_blue[0] - 1, from_pos_blue[1])
+        state, reward, terminated, truncated, info = env.step(from_pos_blue)
+        state, reward, terminated, truncated, info = env.step(to_pos_blue)
+        from_pos_blue = to_pos_blue
+
+    assert env.game_phase == GamePhase.TERMINAL
+    assert reward == 1
+
+@pytest.mark.parametrize(
+    "pieces,total_moves_limit",
+    itertools.product(
+        [SCOUT_ONLY, SPY_ONLY],
+        range(1, 11),
+    )
+)
+def test_total_moves_limit(env_5x5, pieces, total_moves_limit):
+    lakes_mask = np.zeros((5, 5), dtype=bool)
+    lakes_mask[2] = True
+    p1_deploy_mask = np.zeros((5, 5), dtype=bool)
+    p2_deploy_mask = np.zeros((5, 5), dtype=bool)
+    p1_deploy_mask[3:] = True
+    p2_deploy_mask[:2] = True
+    p1_deploy_mask &= ~lakes_mask
+    p2_deploy_mask &= ~lakes_mask
+
+    env = env_5x5(pieces, lakes_mask=lakes_mask, p1_deploy_mask=p1_deploy_mask, p2_deploy_mask=p2_deploy_mask)
+    env.total_moves_limit = total_moves_limit
+
+    repeat_twice(env.step, env.action_space.sample())
+
+    for i in range(total_moves_limit + 1):
+        state, reward, terminated, truncated, info = env.step(env.action_space.sample())
+        state, reward, terminated, truncated, info = env.step(env.action_space.sample())
+
+    assert env.game_phase == GamePhase.TERMINAL
+    assert reward == 0
+
+@pytest.mark.parametrize(
+    "pieces,moves_since_attack_limit",
+    itertools.product(
+        [SCOUT_PAIR, SPY_PAIR],
+        range(1, 11),
+    )
+)
+def test_moves_since_attack_limit(env_5x5, pieces, moves_since_attack_limit):
+    """
+    B.L.s
+    ..LLb
+    LLLLL
+    bLL..
+    s.L.R
+    """
+    lakes_mask = np.zeros((5, 5), dtype=bool)
+    lakes_mask[2] = True
+    lakes_mask[:2, 2] = True
+    lakes_mask[1, 3] = True
+    lakes_mask[3, 1] = True
+    lakes_mask[3:, 2] = True
+    p1_deploy_mask = np.zeros((5, 5), dtype=bool)
+    p2_deploy_mask = np.zeros((5, 5), dtype=bool)
+    p1_deploy_mask[3:] = True
+    p2_deploy_mask[:2] = True
+    p1_deploy_mask[1, 4] = True
+    p2_deploy_mask[3, 0] = True
+    p2_deploy_mask[1, 4] = False
+    p1_deploy_mask[3, 0] = False
+    p1_deploy_mask &= ~lakes_mask
+    p2_deploy_mask &= ~lakes_mask
+
+    _pieces = {Piece.BOMB: 1}
+    _pieces.update(pieces)
+    env = env_5x5(_pieces, lakes_mask=lakes_mask, p1_deploy_mask=p1_deploy_mask, p2_deploy_mask=p2_deploy_mask)
+    env.moves_since_attack_limit = moves_since_attack_limit
     
+    deploy_pos = [(1, 4), (4, 0), (4, 4)]
+    for from_pos in deploy_pos:
+        repeat_twice(env.step, from_pos)
+
+    assert env.game_phase == GamePhase.SELECT
+    moves = [((4, 0), (4, 1)), ((4, 1), (4, 0)), ((4, 0), (3, 0))]
+    for i, move in enumerate(moves):
+        assert env.draw_conditions["moves_since_attack"] == 2 * i
+        move_fwd(env, *move)
+        if env.game_phase == GamePhase.TERMINAL:
+            return
+        assert env.draw_conditions["moves_since_attack"] == 2 * i + 1 or i == 2
+        move_fwd(env, *move)
+        if env.game_phase == GamePhase.TERMINAL:
+            return
+
+    assert env.draw_conditions["moves_since_attack"] == 0
+    assert env.game_phase == GamePhase.SELECT
+    for i in range(moves_since_attack_limit + 1):
+        state, reward, terminated, truncated, info = env.step(env.action_space.sample())
+        state, reward, terminated, truncated, info = env.step(env.action_space.sample())
+
+    assert env.game_phase == GamePhase.TERMINAL
+    assert env.draw_conditions["total_moves"] == 6 + moves_since_attack_limit
+    assert reward == 0
