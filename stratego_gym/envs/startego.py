@@ -416,13 +416,14 @@ class StrategoEnv(Env):
 
         # Check if any pieces can be moved. If one player has no movable pieces, the other player wins.
         # If both players have no movable pieces, the game is a draw.
-        if not terminated and (np.sum(self.board >= Piece.SPY.value) == 0 or self.valid_pieces_to_select().sum() == 0):
-            # print('HELLO CHECK TERMINATED', self.player, (np.sum(self.board >= Piece.SPY.value) == 0))
-            draw_game = (np.sum(self.board <= -Piece.SPY.value) == 0) or self.valid_pieces_to_select(is_other_player=True).sum() == 0
-            # print(f'MASK {self.player}\n', self.valid_pieces_to_select(is_other_player=True))
-            # print('MASK\n', self.valid_pieces_to_select(is_other_player=True))
-            self.game_phase = GamePhase.TERMINAL
-            return self.generate_env_state(), 0 if draw_game else 1, True, False, self.get_info()
+        if not terminated:
+            current_player_no_moves = (np.sum(self.board >= Piece.SPY.value) == 0 or 
+                                       self.valid_pieces_to_select().sum() == 0)
+            if current_player_no_moves:
+                other_player_no_moves = (np.sum(self.board <= -Piece.SPY.value) == 0 or
+                                         self.valid_pieces_to_select(is_other_player=True).sum() == 0)
+                self.game_phase = GamePhase.TERMINAL
+                return self.generate_env_state(), 0 if other_player_no_moves else 1, True, False, self.get_info()
 
         self.game_phase = GamePhase.TERMINAL if terminated else GamePhase.SELECT
         return self.generate_env_state(), reward, terminated, False, self.get_info()

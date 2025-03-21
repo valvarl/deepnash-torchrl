@@ -17,7 +17,6 @@ def env_original() -> StrategoEnv:
 PLACES_TO_DEPLOY_RED_5x5 = [((3, 0), (4, 4)),]
 PLACES_TO_DEPLOY_BLUE_5x5 = [((0, 0), (1, 4)),]
 LAKES_CENTRAL_5x5 = [((2, 2), (2, 2))]
-LAKES_CAVE_5x5 = [((4, 1), (4, 1)), ((3, 0), (3, 0))]
 
 @pytest.fixture()
 def env_5x5():

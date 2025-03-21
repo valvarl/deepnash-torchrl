@@ -138,3 +138,70 @@ def test_lose_on_deploy_surrounded_pieces_and_lakes(
     else:
         # not red_surrounded and not blue_surrounded
         pass
+
+@pytest.mark.parametrize(
+    "pieces,red_stucked,blue_stucked",
+    itertools.product(
+        [SCOUT_ONLY, SPY_ONLY],
+        [True, False],
+        [True, False],
+    )
+)
+def test_two_square_rule_piece_stucked(env_5x5, pieces, red_stucked, blue_stucked):
+    """
+    ...L.
+    ....B
+    LLLLL <- lakes are here so the scout can't escape
+    R....
+    .L...
+    """
+    lakes_mask = np.zeros((5, 5), dtype=bool)
+    lakes_mask[4, 1] = True
+    lakes_mask[0, 3] = True
+    lakes_mask[2] = True
+    p1_deploy_mask = np.zeros((5, 5), dtype=bool)
+    p2_deploy_mask = np.zeros((5, 5), dtype=bool)
+    p1_deploy_mask[3:] = True
+    p2_deploy_mask[:2] = True
+    p1_deploy_mask &= ~lakes_mask
+    p2_deploy_mask &= ~lakes_mask
+
+    env = env_5x5(pieces, lakes_mask=lakes_mask, p1_deploy_mask=p1_deploy_mask, p2_deploy_mask=p2_deploy_mask)
+    from_pos = (3, 0)
+    repeat_twice(env.step, from_pos)
+    piece = Piece(env.board[from_pos])
+    assert piece.value > Piece.LAKE.value
+    assert env.game_phase == GamePhase.SELECT
+    stuck_direction = np.array([1, -1, 1])
+    from_pos_red = from_pos
+    from_pos_blue = from_pos
+    for i, direction in enumerate(stuck_direction):
+        if red_stucked:
+            to_pos_red = (from_pos_red[0] + direction, from_pos_red[1])
+        else:
+            to_pos_red = (from_pos_red[0], from_pos_red[1] + 1)
+        state, reward, terminated, truncated, info = env.step(from_pos_red)
+        state, reward, terminated, truncated, info = env.step(to_pos_red)
+        from_pos_red = to_pos_red
+
+        if blue_stucked:
+            to_pos_blue = (from_pos_blue[0] + direction, from_pos_blue[1])
+        else:
+            to_pos_blue = (from_pos_blue[0], from_pos_blue[1] + 1)
+        state, reward, terminated, truncated, info = env.step(from_pos_blue)
+        state, reward, terminated, truncated, info = env.step(to_pos_blue)
+        from_pos_blue = to_pos_blue
+
+    if red_stucked and blue_stucked or red_stucked:
+        assert env.game_phase == GamePhase.TERMINAL
+        # If the game ends with blue's turn, but he can move, he is awarded 1 on his turn.
+        assert (reward == 0) if blue_stucked else (reward == 1)
+    elif blue_stucked:
+        assert env.game_phase == GamePhase.SELECT
+        state, reward, terminated, truncated, info = env.step(env.action_space.sample())
+        state, reward, terminated, truncated, info = env.step(env.action_space.sample())
+        assert env.game_phase == GamePhase.TERMINAL
+        assert reward == 1
+    else:
+        # not red_stucked and not blue_stucked
+        pass
