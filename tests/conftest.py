@@ -18,7 +18,6 @@ PLACES_TO_DEPLOY_RED_5x5 = [((3, 0), (4, 4)),]
 PLACES_TO_DEPLOY_BLUE_5x5 = [((0, 0), (1, 4)),]
 LAKES_CENTRAL_5x5 = [((2, 2), (2, 2))]
 
-@pytest.fixture()
 def env_5x5():
     def _env_5x5(
         pieces_num: dict[Piece, int], 
@@ -26,6 +25,7 @@ def env_5x5():
         lakes_mask=None,
         p1_deploy_mask=None,
         p2_deploy_mask=None,
+        render_mode=None,
     ) -> StrategoEnv:
         config = StrategoConfig(
             height=5,
@@ -38,10 +38,14 @@ def env_5x5():
             p2_deploy_mask=p2_deploy_mask,
             lakes_mask=lakes_mask,
         )
-        env = StrategoEnv(config)
+        env = StrategoEnv(config, render_mode=render_mode)
         env.reset()
         return env
     return _env_5x5
+
+@pytest.fixture(name="env_5x5")
+def env_5x5_fixture():
+    return env_5x5()
 
 @pytest.fixture()
 def env_10x10():

@@ -5,25 +5,20 @@ import numpy as np
 from stratego_gym.envs.primitives import Piece, Player
 from stratego_gym.envs.startego import WINDOW_SIZE, GamePhase
 
-from config_test import scout_config
+from tests.conftest import env_5x5
 
 def play_with_mouse():
-    env = gym.make("stratego_gym/Stratego-v0", config=scout_config, render_mode="human")
+    env = gym.make("stratego_gym/Stratego-v0", render_mode="human")
     env.reset()
-
-    for i in range(2):
+    #env = env_5x5()(pieces_num={Piece.SCOUT: 1}, render_mode="human")
+    for i in range(80):
         action = env.action_space.sample()
         state, reward, terminated, truncated, info = env.step(action)
-
     env.render()
 
-    time.sleep(0.1)
-
-    selected_piece = None
-    running = True
-
-    start_time = time.time()
     count = 0
+    running = True
+    start_time = time.time()
     while running and time.time() - start_time < 300:
         for event in pygame.event.get():
             if event.type == pygame.QUIT:

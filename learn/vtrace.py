@@ -7,10 +7,7 @@ import numpy as np
 import torch
 from tensordict import TensorDict
 from torch import optim, Tensor
-from torch.nn import utils
 from torch.utils._pytree import tree_map
-
-from deep_nash import DeepNashAgent
 
 
 class EntropySchedule:
@@ -107,69 +104,6 @@ class EntropySchedule:
 
         return alpha, update_target_net
 
-# @chex.dataclass(frozen=True)
-@dataclass(frozen=True)
-class AdamConfig:
-  """Adam optimizer related params."""
-  b1: float = 0.0
-  b2: float = 0.999
-  eps: float = 10e-8
-
-
-# @chex.dataclass(frozen=True)
-@dataclass(frozen=True)
-class NerdConfig:
-  """Nerd related params."""
-  beta: float = 2.0
-  clip: float = 10_000
-
-
-class StateRepresentation(str, enum.Enum):
-  INFO_SET = "info_set"
-  OBSERVATION = "observation"
-
-
-# @chex.dataclass(frozen=True)
-@dataclass(frozen=True)
-class RNaDConfig:
-  """Configuration parameters for the RNaDSolver."""
-  # The game parameter string including its name and parameters.
-  game_name: str
-  # The games longer than this value are truncated. Must be strictly positive.
-  trajectory_max: int = 10
-
-  # The content of the EnvStep.obs tensor.
-  state_representation: StateRepresentation = StateRepresentation.INFO_SET
-
-  # Network configuration.
-  policy_network_layers: Sequence[int] = (256, 256)
-
-  # The batch size to use when learning/improving parameters.
-  batch_size: int = 256
-  # The learning rate for `params`.
-  learning_rate: float = 0.0005
-  # The config related to the ADAM optimizer used for updating `params`.
-  adam: AdamConfig = AdamConfig()
-  # All gradients values are clipped to [-clip_gradient, clip_gradient].
-  clip_gradient: float = 10_000
-  # The "speed" at which `params_target` is following `params`.
-  target_network_avg: float = 0.001
-
-  # RNaD algorithm configuration.
-  # Entropy schedule configuration. See EntropySchedule class documentation.
-  entropy_schedule_repeats: Sequence[int] = (1,)
-  entropy_schedule_size: Sequence[int] = (20_000,)
-  # The weight of the reward regularisation term in RNaD.
-  eta_reward_transform: float = 0.2
-  nerd: NerdConfig = NerdConfig()
-  c_vtrace: float = 1.0
-
-  # Options related to fine tuning of the agent.
-  # finetune: FineTuning = FineTuning() # TODO Add this back in
-
-  # The seed that fully controls the randomness.
-  seed: int = 42
-
 def _policy_ratio(pi: torch.Tensor, mu: torch.Tensor, actions_oh: torch.Tensor,
                   valid: torch.Tensor) -> torch.Tensor:
     """Returns a ratio of policy pi/mu when selecting action a.
@@ -235,10 +169,10 @@ def v_trace(
     player_id = batch["cur_player"]
     assert  player_id.shape == batch.shape
     acting_policy = batch["policy"]
-    assert acting_policy.shape == batch.shape + (100,), f"{acting_policy.shape} {batch.shape}"
+    assert acting_policy.shape == batch.shape + (100,)
     player_others: torch.Tensor = torch.tensor(2 * valid * (batch["cur_player"] == player) - 1).unsqueeze(-1)
     actions_oh = batch["action_one_hot"]
-    assert actions_oh.shape == batch.shape + (100,), f"{actions_oh.shape} {batch.shape}"
+    assert actions_oh.shape == batch.shape + (100,)
     reward = batch["next"]["reward"].squeeze(-1) * batch["cur_player"] * player
 
     gamma = 1.0
@@ -373,20 +307,20 @@ def get_loss_v(v_list: Sequence[Tensor],
 def apply_force_with_threshold(decision_outputs: Tensor, force: Tensor,
                                threshold: float,
                                threshold_center: Tensor) -> Tensor:
-  """Apply the force with below a given threshold."""
-  can_decrease = decision_outputs - threshold_center > -threshold
-  can_increase = decision_outputs - threshold_center < threshold
-  force_negative = torch.minimum(force, torch.tensor(0.0))
-  force_positive = torch.maximum(force, torch.tensor(0.0))
-  clipped_force = can_decrease * force_negative + can_increase * force_positive
-  return decision_outputs * clipped_force.detach()
+    """Apply the force with below a given threshold."""
+    can_decrease = decision_outputs - threshold_center > -threshold
+    can_increase = decision_outputs - threshold_center < threshold
+    force_negative = torch.minimum(force, torch.tensor(0.0))
+    force_positive = torch.maximum(force, torch.tensor(0.0))
+    clipped_force = can_decrease * force_negative + can_increase * force_positive
+    return decision_outputs * clipped_force.detach()
 
 
 def renormalize(loss: Tensor, mask: Tensor) -> Tensor:
-  """The `normalization` is the number of steps over which loss is computed."""
-  loss = torch.sum(torch.where(mask != 0, loss, torch.zeros_like(loss)))
-  normalization = torch.sum(mask)
-  return loss / (normalization + (normalization == 0.0))
+    """The `normalization` is the number of steps over which loss is computed."""
+    loss = torch.sum(torch.where(mask != 0, loss, torch.zeros_like(loss)))
+    normalization = torch.sum(mask)
+    return loss / (normalization + (normalization == 0.0))
 
 
 def get_loss_nerd(logit_list: Sequence[Tensor],
@@ -426,144 +360,3 @@ def get_loss_nerd(logit_list: Sequence[Tensor],
         loss_pi_list.append(nerd_loss)
 
     return sum(loss_pi_list)
-
-class RNaDSolver:
-    def __init__(self, policy: DeepNashAgent, config: RNaDConfig):
-        self.policy = policy
-        self.policy_target = copy.deepcopy(self.policy)
-        self.policy_prev = copy.deepcopy(self.policy)
-        self.policy_prev_ = copy.deepcopy(self.policy)
-
-        self.config = config
-
-        # Learner and actor step counters.
-        self.learner_steps = 0
-        self.actor_steps = 0
-
-        # The machinery related to updating parameters/learner.
-        self._entropy_schedule = EntropySchedule(
-            sizes=self.config.entropy_schedule_size,
-            repeats=self.config.entropy_schedule_repeats)
-
-        # Main network optimizer with Adam and gradient clipping
-        self.optimizer = optim.Adam(
-            self.policy.parameters(),
-            lr=self.config.learning_rate,
-            betas=(self.config.adam.b1, self.config.adam.b2),
-            eps=self.config.adam.eps
-        )
-
-        # Target network optimizer with SGD for Polyak averaging
-        self.optimizer_target = optim.SGD(
-            self.policy_target.parameters(),
-            lr=self.config.target_network_avg
-        )
-
-    def calc_loss(self, batch: TensorDict, traj_dim=-1):
-        logs = {}
-        # breakpoint()
-        batch = batch.transpose(0, traj_dim).cuda()
-
-        def rollout(policy, data):
-            output = policy(data)
-            return output["policy"], output["value"], output["log_probs"], output["logits"]
-
-        _, v_target, _, _ = rollout(self.policy_target, batch.clone())
-        _, _, log_pi_prev, _ = rollout(self.policy_prev, batch.clone())
-        _, _, log_pi_prev_, _ = rollout(self.policy_prev_, batch.clone())
-
-        pi, v, log_pi, logit = rollout(self.policy, batch)
-
-        policy_pprocessed = pi # TODO
-
-        alpha, _ = self._entropy_schedule(self.learner_steps)
-        log_policy_reg = log_pi - (alpha * log_pi_prev + (1 - alpha) * log_pi_prev_)
-
-        v_target_list, has_played_list, v_trace_policy_target_list = [], [], []
-        for player in [1, -1]:
-            v_target_, has_played, policy_target_ = v_trace(
-                v_target,
-                policy_pprocessed,
-                log_policy_reg,
-                player,
-                batch,
-                lambda_=1.0,
-                c=self.config.c_vtrace,
-                rho=torch.inf,
-                eta=self.config.eta_reward_transform
-            )
-            v_target_list.append(v_target_)
-            has_played_list.append(has_played)
-            v_trace_policy_target_list.append(policy_target_)
-
-        # print("#################### V Debugging ######################")
-        # print(v[:, 0].squeeze(-1)[batch["collector"]["mask"][:, 0]])
-        # print("-------------------------------------------------------")
-        # print(v_target_list[0][:, 0].squeeze(-1)[batch["collector"]["mask"][:, 0]])
-        # print(v_target_list[1][:, 0].squeeze(-1)[batch["collector"]["mask"][:, 0]])
-        # print("-------------------------------------------------------")
-        # print(batch["game_phase"][:, 0][batch["collector"]["mask"][:, 0]])
-
-        loss_v = get_loss_v([v] * 2, v_target_list, has_played_list)
-
-        is_vector = torch.unsqueeze(torch.ones_like(batch["collector"]["mask"]), dim=-1)
-        importance_sampling_correction = [is_vector] * 2
-
-        legal_actions = batch["action_mask"]
-        legal_actions = legal_actions.reshape(*legal_actions.shape[:-2], -1)
-        loss_nerd = get_loss_nerd(
-            [logit] * 2, [pi] * 2,
-            v_trace_policy_target_list,
-            batch["collector"]["mask"],
-            batch["cur_player"],
-            legal_actions,
-            importance_sampling_correction,
-            clip=self.config.nerd.clip,
-            threshold=self.config.nerd.beta)
-
-        logs["loss_v"] = loss_v.detach().item()
-        logs["loss_nerd"] = loss_nerd.detach().item()
-        logs["total loss"] = (loss_v + loss_nerd).detach().item()
-
-        return loss_v + loss_nerd, logs
-
-    def step(self, batch):
-        loss, logs = self.calc_loss(batch)
-
-        # breakpoint()
-
-        # TODO: Add logging of the loss and other metrics
-
-        self.optimizer.zero_grad()
-
-        # print("Checking gradients BEFORE backward pass:")
-        # for name, param in self.policy.named_parameters():
-        #     if param.grad is not None:
-        #         print(f"{name}: {torch.isnan(param.grad).any()} {torch.isinf(param.grad).any()}")
-
-        loss.backward()
-
-        # print("Checking gradients AFTER backward pass:")
-        # for name, param in self.policy.named_parameters():
-        #     if param.grad is not None:
-        #         print(f"{name}: {torch.isnan(param.grad).any()} {torch.isinf(param.grad).any()}")
-
-        utils.clip_grad_norm_(self.policy.parameters(), self.config.clip_gradient)
-        self.optimizer.step()
-
-        self.optimizer_target.zero_grad()
-        with torch.no_grad():
-            for param_t, param_m in zip(self.policy_target.parameters(), self.policy.parameters()):
-                # "Difference" = (target - main). This is our "pseudo-gradient".
-                param_t.grad = (param_t - param_m).detach().clone()
-
-        self.optimizer_target.step()
-
-        _, update_target_net = self._entropy_schedule(self.learner_steps)
-        if update_target_net:
-            self.policy_prev_.load_state_dict(self.policy_prev.state_dict())
-            self.policy_prev.load_state_dict(self.policy_target.state_dict())
-
-        self.learner_steps += 1
-
-        return logs

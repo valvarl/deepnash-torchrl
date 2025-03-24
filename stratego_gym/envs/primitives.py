@@ -1,4 +1,6 @@
 
+from __future__ import annotations
+
 from enum import Enum, auto
 
 
@@ -17,6 +19,9 @@ class Piece(Enum):
     COLONEL = 11
     GENERAL = 12
     MARSHAL = 13
+
+    def __lt__(self, other: Piece):
+        return self.value < other.value
 
 class Player(Enum):
     RED = 1

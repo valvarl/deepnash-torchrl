@@ -45,9 +45,9 @@ def basic_test():
         count += 1
         if terminated:
             games += 1
-            print(f"Game over! Player {-1 * info['cur_player']} received {reward}, game: {games}, turn: {info['total_moves']}")
-            if reward == 0 and not (env.draw_conditions['total_moves'] == 2000 or env.draw_conditions['moves_since_attack'] == 200):
-                print(env.draw_conditions)
+            print(f"Game over! Player {-1 * info['cur_player']} received {reward}, game: {games}, turn: {info['total_moves']}, turn: {info['moves_since_attack']}")
+            if reward == 0 and not (info['total_moves'] == 2000 or info['moves_since_attack'] == 200):
+                # print(env.draw_conditions)
                 print(env.board)
                 print('p1', env.two_square_detector.p1)
                 print('p2', env.two_square_detector.p2)
@@ -56,67 +56,11 @@ def basic_test():
             env.reset()
     print(count)
 
-def two_square_test():
-    env = gym.make("stratego_gym/Stratego-v0", render_mode="human")
-    env.reset()
-
-    for i in range(80):
-        action = env.action_space.sample()
-        state, reward, terminated, truncated, info = env.step(action)
-
-    env.render()
-    time.sleep(1)
-
-    env.step((6, 0))
-    env.step((5, 0))
-
-    env.render()
-    time.sleep(1)
-
-    env.step((6, 0))
-    env.step((5, 0))
-
-    env.render()
-    time.sleep(1)
-
-    env.step((5, 0))
-    env.step((6, 0))
-
-    env.render()
-    time.sleep(1)
-
-    env.step((5, 0))
-    env.step((6, 0))
-
-    env.render()
-    time.sleep(1)
-
-    env.step((6, 0))
-    env.step((5, 0))
-
-    env.render()
-    time.sleep(1)
-
-    env.step((6, 0))
-    env.step((5, 0))
-
-    env.render()
-    time.sleep(1)
-
-    env.step((5, 0))
-    env.step((6, 0))
-
-    env.render()
-    time.sleep(1)
-
-    env.step((5, 0))
-    env.step((6, 0))
-
 
 def policy_test():
     device = "cuda"
-    # agent = DeepNashAgent().to(device)
-    agent = torch.load("DeepNashPolicy.pt").to(device)
+    agent = DeepNashAgent().to(device)
+    # agent = torch.load("DeepNashPolicy.pt").to(device)
 
     reader = default_info_dict_reader(["cur_player"])
     env = GymEnv("stratego_gym/Stratego-v0", render_mode=None).set_info_dict_reader(reader).to(device)
@@ -179,6 +123,7 @@ def vectorized_test(n_procs, n_workers):
     start_time = time.time()
     count = 0
     for data in collector:
+        print(data.shape)
         memory.extend(data)
         print("Batch Added to Replay Buffer: " + str(count))
         count += 1
@@ -186,8 +131,7 @@ def vectorized_test(n_procs, n_workers):
 
 
 if __name__ == '__main__':
-    # vectorized_test(10, 4)
-    # policy_test()
-    basic_test()
+    # vectorized_test(4, 4)
+    policy_test()
+    # basic_test()
     # rollout_test()
-    # two_square_test()

@@ -52,14 +52,14 @@ class PlayerStateHandler:
     ):
         self.pieces = np.arange(len(pieces_num))[pieces_num != 0]
         self.movable_pieces = self.pieces[~np.isin(self.pieces, [Piece.FLAG.value, Piece.BOMB.value])]
-        print(self.pieces)
-        print(self.movable_pieces)
+        # print(self.pieces)
+        # print(self.movable_pieces)
         self.deploy_idx = 0
         self.deploy_mask = np.copy(deploy_mask)
         # 1st channel is unmoved, 2nd channel is moved, 3rd channel is revealed
         self.public_obs_info = np.zeros((3, height, width))
         self.unrevealed = np.copy(pieces_num)
-        print(self.unrevealed)
+        # print(self.unrevealed)
         self.observed_moves = np.zeros((observed_history_entries, height, width))
 
 
