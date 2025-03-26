@@ -8,10 +8,10 @@ from stratego_gym.envs.startego import WINDOW_SIZE, GamePhase
 from tests.conftest import env_5x5
 
 def play_with_mouse():
-    env = gym.make("stratego_gym/Stratego-v0", render_mode="human")
-    env.reset()
-    #env = env_5x5()(pieces_num={Piece.SCOUT: 1}, render_mode="human")
-    for i in range(80):
+    # env = gym.make("stratego_gym/Stratego-v0", render_mode="human")
+    # env.reset()
+    env = env_5x5()(pieces_num={Piece.FLAG: 1, Piece.SCOUT: 1}, render_mode="human")
+    for i in range(0):
         action = env.action_space.sample()
         state, reward, terminated, truncated, info = env.step(action)
     env.render()

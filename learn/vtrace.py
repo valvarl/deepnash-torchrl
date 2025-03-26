@@ -169,10 +169,10 @@ def v_trace(
     player_id = batch["cur_player"]
     assert  player_id.shape == batch.shape
     acting_policy = batch["policy"]
-    assert acting_policy.shape == batch.shape + (100,)
+    assert acting_policy.shape == batch.shape + (16,)
     player_others: torch.Tensor = torch.tensor(2 * valid * (batch["cur_player"] == player) - 1).unsqueeze(-1)
     actions_oh = batch["action_one_hot"]
-    assert actions_oh.shape == batch.shape + (100,)
+    assert actions_oh.shape == batch.shape + (16,)
     reward = batch["next"]["reward"].squeeze(-1) * batch["cur_player"] * player
 
     gamma = 1.0

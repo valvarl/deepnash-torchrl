@@ -254,8 +254,8 @@ class StrategoEnv(Env):
 
         if self.game_phase == GamePhase.DEPLOY:
             if self.valid_spots_to_place()[action] == 0:
-                # action = tuple(self.action_space.sample())
-                raise ValueError("Invalid Deployment Location")
+                action = tuple(self.action_space.sample())
+                # raise ValueError("Invalid Deployment Location")
 
             if self.player == Player.RED:
                 self.board[action] = np.repeat(np.arange(len(Piece),), self.p1.unrevealed)[self.p1.deploy_idx]
@@ -290,8 +290,8 @@ class StrategoEnv(Env):
 
         elif self.game_phase == GamePhase.SELECT:
             if self.valid_pieces_to_select()[action] == 0:
-                # action = tuple(self.action_space.sample())
-                raise ValueError("Invalid Piece Selection")
+                action = tuple(self.action_space.sample())
+                # raise ValueError("Invalid Piece Selection")
 
             if self.player == Player.RED:
                 self.p1.last_selected = action
@@ -310,17 +310,17 @@ class StrategoEnv(Env):
         source = self.p1.last_selected if self.player == Player.RED else self.p2.last_selected
         dest = action
 
-        if self.player == Player.RED:
-            self.p1.last_selected = action
-        else:
-            self.p2.last_selected = action
-
         # Action is a tuple representing a coordinate on the board
         valid, msg = self.check_action_valid(source, dest)
         if not valid:
             action = tuple(self.action_space.sample())
             dest = action
             # raise ValueError(msg)
+
+        if self.player == Player.RED:
+            self.p1.last_selected = action
+        else:
+            self.p2.last_selected = action
 
         # Get Selected Piece Identity and Destination Identity
         selected_piece = self.board[source]
@@ -498,7 +498,7 @@ class StrategoEnv(Env):
         deploy_mask = self.p1.deploy_mask if self.player == Player.RED else np.rot90(self.p2.deploy_mask, 2)
         return (self.board == Piece.EMPTY.value) & deploy_mask
 
-    def valid_pieces_to_select(self, is_other_player=False) -> np.ndarray:
+    def valid_pieces_to_select(self, is_other_player=False, debug_print=False) -> np.ndarray:
         board = self.board if not is_other_player else np.rot90(self.board, 2) * -1
         padded_board = np.pad(board, 1, constant_values=Piece.LAKE.value)
         padded_board[padded_board == -Piece.LAKE.value] = Piece.LAKE.value
@@ -523,6 +523,15 @@ class StrategoEnv(Env):
         valid_two_square, pos_twosq = self.two_square_detector.validate_select(player, piece, pos)
         _pos = pos if player == Player.RED else (self.height - pos[0] - 1, self.width - pos[1] - 1)
         valid_chasing, pos_chasing = self.chasing_detector.validate_select(player, piece, _pos, board)
+
+        if debug_print:
+            print('check cond', not (valid_two_square and valid_chasing))
+            print(player)
+            print(piece)
+            print(pos)
+            p = self.p2 if player == Player.RED else self.p1
+            print(p.last_selected, p.last_selected_piece)
+            print(self.two_square_detector.validate_select(player, piece, pos))
         
         if not (valid_two_square and valid_chasing):
             mask = np.zeros((self.height, self.width), dtype=bool)
@@ -550,6 +559,10 @@ class StrategoEnv(Env):
                         if board[_pos] >= Piece.LAKE.value or board[_pos] == -Piece.LAKE.value:
                             surrounded_square += 1
                         break
+                    elif piece == Piece.SCOUT and board[_pos] <= -Piece.SPY.value:
+                        surrounded_square += 1
+                        break
+
                     if piece != Piece.SCOUT:
                         if mask[_pos]:
                             surrounded_square += 1
@@ -564,7 +577,8 @@ class StrategoEnv(Env):
             if surrounded_square == 4:
                 surrounded[pos] = True
 
-            # print(player, 'BOARD\n', board, 'MASK\n', mask, surrounded_square, 'SURROUNDED\n', surrounded)
+            if debug_print:
+                print(player, 'BOARD\n', board, 'MASK\n', mask, surrounded_square, 'SURROUNDED\n', surrounded)
 
         return np.logical_and(board >= Piece.SPY.value, ~surrounded).astype(int)
 

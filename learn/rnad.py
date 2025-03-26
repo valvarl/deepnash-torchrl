@@ -1,3 +1,4 @@
+from datetime import datetime
 import logging
 import os
 import time
@@ -28,10 +29,10 @@ class RNaDSolver:
         self.wandb = wandb
 
         if directory_name is None:
-            directory_name = str(int(time.perf_counter()))
+            directory_name = datetime.now().strftime("%y%m%d_%H%M")
         self.directory_name = directory_name
 
-        self.saved_keys = self.__dict__.keys()
+        self.saved_keys = list(self.__dict__.keys())
         # only the above members are saved in and reloaded from the 'params' object
 
         saved_runs_dir = os.path.join(
@@ -127,7 +128,7 @@ class RNaDSolver:
 
         else:
 
-            params_dict = torch.load(os.path.join(self.directory, "params"))
+            params_dict = torch.load(os.path.join(self.directory, "params"), weights_only=False)
             for key, value in params_dict.items():
                 if key == "directory_name":
                     params_dict[key] = self.directory_name
@@ -166,7 +167,7 @@ class RNaDSolver:
         Updates the net weights, optimizer state, and certain stat members from those saved in the checkpoint
         """
 
-        saved_dict = torch.load(os.path.join(self.directory, str(m), str(n)))
+        saved_dict = torch.load(os.path.join(self.directory, str(m), str(n)), weights_only=False)
         self.learner_steps = saved_dict["learner_steps"]
         self.actor_steps = saved_dict["actor_steps"]
         self.policy = self.__new_net()
@@ -309,7 +310,7 @@ class RNaDSolver:
 
         _, update_target_net = self._entropy_schedule(self.learner_steps)
         if update_target_net:
-            self.n = 0
+            self.n = -1
             self.m += 1
             self.policy_prev_.load_state_dict(self.policy_prev.state_dict())
             self.policy_prev.load_state_dict(self.policy_target.state_dict())
@@ -340,16 +341,16 @@ class RNaDSolver:
         log_mod:
             Compute logs during learning after this many steps, starting at m=0. 
         """
-        for updates, data in range(collector):
+        for updates, data in enumerate(collector):
             if updates >= max_updates:
                 break
 
             if self.m > sum(self.config.entropy_schedule_repeats):
                 break
-
-            if self.m % expl_mod == 0 and self.n == 0 and self.m != 0:
+            
+            if self.n % expl_mod:
                 eval_logs = evaluate_fn(self.policy)
-                logging.info("Evaluating results:\n", eval_logs)
+                logging.info(f"win: {eval_logs['win']}, draw: {eval_logs['draw']}, loss: {eval_logs['loss']}")
                 if self.wandb:
                     wandb.log(eval_logs, step=self.learner_steps)
 
@@ -368,9 +369,9 @@ class RNaDSolver:
         self, 
         collector, 
         max_updates: int = 10**6, 
-        checkpoint_mod: int = 1000, 
-        expl_mod: int = 1, 
-        log_mod: int = 20,
+        checkpoint_mod: int = 50, 
+        expl_mod: int = 100, 
+        log_mod: int = 1,
         evaluate_fn: Callable[[TensorDictModule], dict[str, float]] = None,
     ):
         """
