@@ -15,6 +15,28 @@ from deep_nash.agent import DeepNashAgent
 from learn.config import RNaDConfig
 from learn.vtrace import EntropySchedule, get_loss_nerd, get_loss_v, v_trace
 
+
+def kld(
+    p: torch.Tensor,
+    q: torch.Tensor,
+    valid: torch.Tensor,
+    legal_actions: torch.Tensor,
+    valid_count: int = None,
+):
+    if valid_count is None:
+        valid_count = valid.sum().item()
+    return (
+        torch.where(
+            (valid.unsqueeze(-1) * legal_actions).to(torch.bool),
+            p * (torch.log(p) - torch.log(q)),
+            0,
+        )
+        .sum()
+        .item()
+        / valid_count
+    )
+
+
 class RNaDSolver:
     def __init__(
         self, 
@@ -208,8 +230,7 @@ class RNaDSolver:
             os.mkdir(os.path.join(self.directory, str(self.m)))
         torch.save(saved_dict, os.path.join(self.directory, str(self.m), str(self.n)))
 
-    def __calc_loss(self, batch: TensorDict, traj_dim=-1):
-        logs = {}
+    def __calc_loss(self, batch: TensorDict, traj_dim=-1, logs_enabled=False):
         # breakpoint()
         batch = batch.transpose(0, traj_dim)
 
@@ -217,33 +238,33 @@ class RNaDSolver:
             output = policy(data)
             return output["policy"], output["value"], output["log_probs"], output["logits"]
 
-        _, v_target, _, _ = rollout(self.policy_target, batch.clone())
-        _, _, log_pi_prev, _ = rollout(self.policy_prev, batch.clone())
-        _, _, log_pi_prev_, _ = rollout(self.policy_prev_, batch.clone())
-
         pi, v, log_pi, logit = rollout(self.policy, batch)
-
         policy_pprocessed = pi # TODO
-
-        alpha, _ = self._entropy_schedule(self.learner_steps)
-        log_policy_reg = log_pi - (alpha * log_pi_prev + (1 - alpha) * log_pi_prev_)
-
         v_target_list, has_played_list, v_trace_policy_target_list = [], [], []
-        for player in [1, -1]:
-            v_target_, has_played, policy_target_ = v_trace(
-                v_target,
-                policy_pprocessed,
-                log_policy_reg,
-                player,
-                batch,
-                lambda_=1.0,
-                c=self.config.c_vtrace,
-                rho=torch.inf,
-                eta=self.config.eta_reward_transform
-            )
-            v_target_list.append(v_target_)
-            has_played_list.append(has_played)
-            v_trace_policy_target_list.append(policy_target_)
+
+        with torch.no_grad():
+            pi_target, v_target, _, _ = rollout(self.policy_target, batch.clone())
+            _, _, log_pi_prev, _ = rollout(self.policy_prev, batch.clone())
+            _, _, log_pi_prev_, _ = rollout(self.policy_prev_, batch.clone())
+
+            alpha, _ = self._entropy_schedule(self.learner_steps)
+            log_policy_reg = log_pi - (alpha * log_pi_prev + (1 - alpha) * log_pi_prev_)
+
+            for player in [1, -1]:
+                v_target_, has_played, policy_target_ = v_trace(
+                    v_target,
+                    policy_pprocessed,
+                    log_policy_reg,
+                    player,
+                    batch,
+                    lambda_=1.0,
+                    c=self.config.c_vtrace,
+                    rho=torch.inf,
+                    eta=self.config.eta_reward_transform
+                )
+                v_target_list.append(v_target_)
+                has_played_list.append(has_played)
+                v_trace_policy_target_list.append(policy_target_)
 
         # print("#################### V Debugging ######################")
         # print(v[:, 0].squeeze(-1)[batch["collector"]["mask"][:, 0]])
@@ -255,7 +276,8 @@ class RNaDSolver:
 
         loss_v = get_loss_v([v] * 2, v_target_list, has_played_list)
 
-        is_vector = torch.unsqueeze(torch.ones_like(batch["collector"]["mask"]), dim=-1)
+        valid = batch["collector"]["mask"]
+        is_vector = torch.unsqueeze(torch.ones_like(valid), dim=-1)
         importance_sampling_correction = [is_vector] * 2
 
         legal_actions = batch["action_mask"]
@@ -263,27 +285,14 @@ class RNaDSolver:
         loss_nerd = get_loss_nerd(
             [logit] * 2, [pi] * 2,
             v_trace_policy_target_list,
-            batch["collector"]["mask"],
+            valid,
             batch["cur_player"],
             legal_actions,
             importance_sampling_correction,
             clip=self.config.nerd.clip,
             threshold=self.config.nerd.beta)
-
-        logs["loss_v"] = loss_v.detach().item()
-        logs["loss_nerd"] = loss_nerd.detach().item()
-        logs["total loss"] = (loss_v + loss_nerd).detach().item()
-
-        return loss_v + loss_nerd, logs
-    
-    def __step(self, batch):
-        loss, logs = self.__calc_loss(batch)
-
-        # breakpoint()
-
-        # TODO: Add logging of the loss and other metrics
-
-        self.optimizer.zero_grad()
+        
+        loss = loss_v + loss_nerd
 
         # print("Checking gradients BEFORE backward pass:")
         # for name, param in self.policy.named_parameters():
@@ -297,7 +306,44 @@ class RNaDSolver:
         #     if param.grad is not None:
         #         print(f"{name}: {torch.isnan(param.grad).any()} {torch.isinf(param.grad).any()}")
 
+        logs = {}
+        if logs_enabled:
+            total_norm = 0
+            for p in self.policy.parameters():
+                param_norm = p.grad.detach().data.norm(2)
+                total_norm += param_norm.item() ** 2
+            total_norm = total_norm**0.5
+
+            avg_traj_len = valid.sum(0).float().mean(-1)
+            logit_mean = logit.mean().item()
+            logit_max_from_mean = torch.max(torch.abs(logit - logit_mean)).item()
+
+            uniform_policy = torch.nn.functional.normalize(legal_actions.float(), p=1, dim=-1)
+            entropy = kld(pi, uniform_policy, valid, legal_actions=legal_actions)
+            entropy_target = kld(pi_target, uniform_policy, valid, legal_actions=legal_actions)
+            actor_learner_kld = kld(pi, batch["policy"], valid, legal_actions=legal_actions)
+
+            to_log = {
+                "loss_v": loss_v.detach().item(),
+                "loss_nerd": loss_nerd.detach().item(),
+                "total_loss": loss.detach().item(),
+                "traj_len": avg_traj_len.detach().item(),
+                "gradient_norm": total_norm,
+                "logit_mean": logit_mean,
+                "logit_max": logit_max_from_mean,
+                "entropy": entropy,
+                "entropy_target": entropy_target,
+                "actor_learner_kld": actor_learner_kld,
+            }
+            logs.update(to_log)
+
         nn.utils.clip_grad_norm_(self.policy.parameters(), self.config.clip_gradient)
+
+        return logs
+    
+    def __step(self, batch, logs_enabled=False):
+        self.optimizer.zero_grad()
+        logs = self.__calc_loss(batch, logs_enabled=logs_enabled)
         self.optimizer.step()
 
         self.optimizer_target.zero_grad()
@@ -348,7 +394,7 @@ class RNaDSolver:
             if self.m > sum(self.config.entropy_schedule_repeats):
                 break
             
-            if self.n % expl_mod:
+            if self.n % expl_mod == 0:
                 eval_logs = evaluate_fn(self.policy)
                 logging.info(f"win: {eval_logs['win']}, draw: {eval_logs['draw']}, loss: {eval_logs['loss']}")
                 if self.wandb:
@@ -361,17 +407,17 @@ class RNaDSolver:
             if self.n % checkpoint_mod == 0:
                 self.__save_checkpoint()
             
-            logs = self.__step(data)
-            if self.n % log_mod == 0 and self.wandb:
+            logs = self.__step(data, logs_enabled=self.n % log_mod == 0 and self.wandb)
+            if logs:
                 wandb.log(logs, step=self.learner_steps)
     
     def run(
-        self, 
-        collector, 
-        max_updates: int = 10**6, 
-        checkpoint_mod: int = 50, 
-        expl_mod: int = 100, 
-        log_mod: int = 1,
+        self,
+        collector,
+        max_updates: int = 10**6,
+        checkpoint_mod: int = 20,
+        expl_mod: int = 20,
+        log_mod: int = 5,
         evaluate_fn: Callable[[TensorDictModule], dict[str, float]] = None,
     ):
         """

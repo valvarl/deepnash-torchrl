@@ -112,8 +112,8 @@ if __name__ == "__main__":
     envs = [ParallelEnv(workers_per_collector, env_maker) for _ in range(num_collectors)]
 
     # Initialize the MultiaSyncDataCollector
-    collector = MultiaSyncDataCollector(
-        create_env_fn=envs,
+    collector = SyncDataCollector(
+        create_env_fn=env_maker,
         policy=policy,
         frames_per_batch=5120,
         total_frames=5120 * 100000,
@@ -125,7 +125,7 @@ if __name__ == "__main__":
         split_trajs=True,
     )
 
-    solver = RNaDSolver(config=RNaDConfig(game_name="stratego"), wandb=True, directory_name="250326_0115")
+    solver = RNaDSolver(config=RNaDConfig(game_name="stratego"), wandb=True)
     solver.run(collector, evaluate_fn=evaluate_random)
 
     collector.shutdown()
