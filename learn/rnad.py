@@ -9,6 +9,8 @@ from tensordict.nn import TensorDictModule
 import torch
 from torch import nn
 from torch import optim, Tensor
+from torchrl.collectors import MultiaSyncDataCollector, SyncDataCollector, MultiSyncDataCollector
+from torchrl.envs import ParallelEnv
 import wandb
 
 from deep_nash.agent import DeepNashAgent
@@ -406,6 +408,7 @@ class RNaDSolver:
 
             if self.n % checkpoint_mod == 0:
                 self.__save_checkpoint()
+                collector.update_policy_weights_()
             
             logs = self.__step(data, logs_enabled=self.n % log_mod == 0 and self.wandb)
             if logs:
@@ -413,7 +416,7 @@ class RNaDSolver:
     
     def run(
         self,
-        collector,
+        env_maker,
         max_updates: int = 10**6,
         checkpoint_mod: int = 20,
         expl_mod: int = 20,
@@ -425,6 +428,26 @@ class RNaDSolver:
         """
 
         self.__initialize()
+
+        # Define the number of collectors and workers per collector
+        num_collectors = 4
+        workers_per_collector = 4
+        envs = [ParallelEnv(workers_per_collector, env_maker) for _ in range(num_collectors)]
+
+        # Initialize the MultiaSyncDataCollector
+        collector = SyncDataCollector(
+            create_env_fn=env_maker,
+            policy=self.policy,
+            frames_per_batch=5120,
+            total_frames=5120 * 100000,
+            # device="cuda",
+            storing_device="cpu",
+            policy_device="cuda",
+            env_device="cpu",
+            # update_at_each_batch=True,
+            split_trajs=True,
+        )
+
         self.__resume(
             collector=collector,
             max_updates=max_updates,
@@ -433,5 +456,8 @@ class RNaDSolver:
             log_mod=log_mod,
             evaluate_fn=evaluate_fn,
         )
+
+        collector.shutdown()
+
         if self.wandb:
             wandb.finish()

@@ -3,8 +3,7 @@ import logging
 import numpy as np
 from tensordict.nn import TensorDictModule
 import torch
-from torchrl.collectors import MultiaSyncDataCollector, SyncDataCollector, MultiSyncDataCollector
-from torchrl.envs import default_info_dict_reader, ParallelEnv
+from torchrl.envs import default_info_dict_reader
 from torchrl.envs.libs.gym import GymEnv
 from tqdm import tqdm
 
@@ -99,36 +98,9 @@ if __name__ == "__main__":
     torch.autograd.set_detect_anomaly(True)
     logging.basicConfig(level=logging.DEBUG)
 
-    # 2. Define a policy
-    policy = DeepNashAgent()
-    # policy = torch.load("DeepNashPolicy.pt").cpu()
-    env = env_maker()
-    policy(env.reset())
-    policy.to("cuda")
+    solver = RNaDSolver(config=RNaDConfig(game_name="stratego"), wandb=True, directory_name="250326_2357")
+    solver.run(env_maker, evaluate_fn=evaluate_random)
 
-    # Define the number of collectors and workers per collector
-    num_collectors = 4
-    workers_per_collector = 4
-    envs = [ParallelEnv(workers_per_collector, env_maker) for _ in range(num_collectors)]
-
-    # Initialize the MultiaSyncDataCollector
-    collector = SyncDataCollector(
-        create_env_fn=env_maker,
-        policy=policy,
-        frames_per_batch=5120,
-        total_frames=5120 * 100000,
-        # device="cuda",
-        storing_device="cpu",
-        policy_device="cuda",
-        env_device="cpu",
-        # update_at_each_batch=True,
-        split_trajs=True,
-    )
-
-    solver = RNaDSolver(config=RNaDConfig(game_name="stratego"), wandb=True)
-    solver.run(collector, evaluate_fn=evaluate_random)
-
-    collector.shutdown()
     # for name, param in policy.named_parameters():
     #     if param.requires_grad:
     #         print(f"{name}: {param.data}")
