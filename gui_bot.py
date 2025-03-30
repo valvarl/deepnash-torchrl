@@ -4,10 +4,10 @@ import time
 import numpy as np
 import torch
 from torchrl.envs import default_info_dict_reader
-from deep_nash.agent import DeepNashAgent
-from stratego_gym.envs.config import StrategoConfig
-from stratego_gym.envs.primitives import Piece, Player
-from stratego_gym.envs.startego import WINDOW_SIZE, GamePhase, StrategoEnv
+from deepnash.nn.agent import DeepNashAgent
+from deepnash.stratego_gym.envs.config import StrategoConfig
+from deepnash.stratego_gym.envs.primitives import Piece, Player
+from deepnash.stratego_gym.envs.startego import WINDOW_SIZE, GamePhase, StrategoEnv
 
 MAP_4x4 = np.array([[0, 0, 0, 0],
                     [0, 0, 0, 1],

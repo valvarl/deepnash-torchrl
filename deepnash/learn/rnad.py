@@ -13,7 +13,7 @@ from torchrl.collectors import MultiaSyncDataCollector, SyncDataCollector, Multi
 from torchrl.envs import ParallelEnv
 import wandb
 
-from deep_nash.agent import DeepNashAgent
+from deepnash.nn.agent import DeepNashAgent
 from learn.config import RNaDConfig
 from learn.vtrace import EntropySchedule, get_loss_nerd, get_loss_v, v_trace
 

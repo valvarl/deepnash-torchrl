@@ -6,14 +6,13 @@ from torchrl.data import LazyTensorStorage, SliceSampler, ReplayBuffer
 from torchrl.envs.libs.gym import GymEnv
 from torchrl.envs import default_info_dict_reader, ParallelEnv
 
-import stratego_gym
 import gymnasium as gym
 from gymnasium.vector import AsyncVectorEnv
 import numpy as np
 import time
 
-from deep_nash.agent import DeepNashAgent
-from stratego_gym.envs.primitives import Piece, Player
+from deepnash import DeepNashAgent
+from deepnash.stratego_gym.envs.primitives import Piece, Player
 
 
 def basic_test():

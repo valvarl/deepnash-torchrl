@@ -10,7 +10,7 @@ from tensordict import TensorDictBase
 from tensordict.nn import TensorDictModule
 from torch import Tensor
 
-from deep_nash.network import DeepNashNet
+from .network import DeepNashNet
 
 
 class DeepNashAgent(TensorDictModule):

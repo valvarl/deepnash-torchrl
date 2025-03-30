@@ -2,8 +2,8 @@ import pygame
 import gymnasium as gym
 import time
 import numpy as np
-from stratego_gym.envs.primitives import Piece, Player
-from stratego_gym.envs.startego import WINDOW_SIZE, GamePhase
+from deepnash.stratego_gym.envs.primitives import Piece, Player
+from deepnash.stratego_gym.envs.startego import WINDOW_SIZE, GamePhase
 
 from tests.conftest import env_5x5
 

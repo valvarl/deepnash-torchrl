@@ -7,12 +7,12 @@ from torchrl.envs import default_info_dict_reader
 from torchrl.envs.libs.gym import GymEnv
 from tqdm import tqdm
 
-from deep_nash import DeepNashAgent
-from learn.rnad import RNaDSolver
-from learn.config import RNaDConfig
-from stratego_gym.envs.config import StrategoConfig
-from stratego_gym.envs.primitives import Piece
-from stratego_gym.envs.startego import GamePhase  # must be importable on the driver side too
+from deepnash.nn import DeepNashAgent
+from deepnash.learn.rnad import RNaDSolver
+from deepnash.learn.config import RNaDConfig
+from deepnash.stratego_gym.envs.config import StrategoConfig
+from deepnash.stratego_gym.envs.primitives import Piece
+from deepnash.stratego_gym.envs.startego import GamePhase  # must be importable on the driver side too
 
 MAP_4x4 = np.array([[0, 0, 0, 0],
                     [0, 0, 0, 1],
