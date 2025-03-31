@@ -73,8 +73,7 @@ void StrategoEnv::reset(uint32_t seed) {
     chasing_detector_.reset();
 }
 
-const std::vector<double>& StrategoEnv::generate_observation() const {
-    std::vector<double> obs;
+void StrategoEnv::generate_observation(std::vector<double> &obs) const {
     obs.reserve(allowed_pieces_.size() * 3 + observed_history_entries_ + 6);
 
     // 1. Lakes
@@ -97,39 +96,19 @@ const std::vector<double>& StrategoEnv::generate_observation() const {
 
     // 3. Public observation and move history
     if (game_phase_ == GamePhase::DEPLOY) {
-        size_t num_pieces = allowed_pieces_.size();
-        for (size_t ch = 0; ch < num_pieces * 2 + observed_history_entries_; ++ch) {
-            for (size_t i = 0; i < height_; ++i) {
-                for (size_t j = 0; j < width_; ++j) {
-                    obs.push_back(0.0);
-                }
-            }
-        }
+        obs.resize(obs.size() + (allowed_pieces_.size() * 2 + observed_history_entries_) * height_ * width_, 0.0);
     } else {
+        std::vector<double> public_obs, opp_public_obs, move_matrix;
         const PlayerStateHandler& cur = current_player_ == Player::RED ? p1_ : p2_;
         const PlayerStateHandler& opp = current_player_ == Player::RED ? p2_ : p1_;
-
-        auto public_obs_matrix = get_public_obs(cur.public_obs_info(), cur.unrevealed(), cur.pieces(), cur.movable_pieces());
-        auto opp_public_obs_matrix = get_public_obs(opp.public_obs_info(), opp.unrevealed(), opp.pieces(), opp.movable_pieces());
-
-        for (const auto& channel : public_obs_matrix) {
-            for (size_t i = 0; i < height_; ++i)
-                for (size_t j = 0; j < width_; ++j)
-                    obs.push_back(channel(i, j));
-        }
-
-        for (const auto& channel : opp_public_obs_matrix) {
-            for (size_t i = 0; i < height_; ++i)
-                for (size_t j = 0; j < width_; ++j)
-                    obs.push_back(channel(i, j));
-        }
-
-        const auto& move_matrix = (current_player_ == Player::RED ? p1_ : p2_).observed_moves();
-        for (const auto& move : move_matrix) {
-            for (size_t i = 0; i < height_; ++i)
-                for (size_t j = 0; j < width_; ++j)
-                    obs.push_back(move(i, j));
-        }
+        
+        get_public_obs(cur.public_obs_info(), cur.unrevealed(), cur.pieces(), cur.movable_pieces(), public_obs);
+        get_public_obs(opp.public_obs_info(), opp.unrevealed(), opp.pieces(), opp.movable_pieces(), opp_public_obs);
+        (current_player_ == Player::RED ? p1_ : p2_).observed_moves();
+        
+        obs.emplace_back(public_obs);
+        obs.emplace_back(opp_public_obs);
+        obs.emplace_back(move_matrix);
     }
 
     // 4. Scalar info
@@ -152,36 +131,33 @@ const std::vector<double>& StrategoEnv::generate_observation() const {
             obs.push_back((i == last_selected[0] && j == last_selected[1]) ? 1.0 : 0.0);
         }
     }
-
-    return obs;
 }
 
-std::pair<const std::vector<double>&, const Matrix<bool>&> StrategoEnv::generate_env_state() {
-    auto obs = generate_observation();
-    Matrix<bool> action_mask(0, 0);
+void StrategoEnv::generate_env_state(
+    std::vector<double>& obs,
+    std::vector<bool>& action_mask
+) {
+    generate_observation(obs);
     if (game_phase_ == GamePhase::DEPLOY) {
-        action_mask = valid_spots_to_place();
+        valid_spots_to_place(action_mask);
     } else if (game_phase_ == GamePhase::SELECT) {
-        action_mask = valid_pieces_to_select();
+        valid_pieces_to_select(action_mask);
     } else {
-        action_mask = valid_destinations();
+        valid_destinations(action_mask);
     }
-    action_space_.set_mask(action_mask.data());
-    return {obs, action_mask};
+    action_space_.set_mask(action_mask);
 }
 
-const std::vector<Matrix<double>>& StrategoEnv::get_public_obs(
+void StrategoEnv::get_public_obs(
     const std::array<Matrix<bool>, 3>& public_obs_info,
     const std::vector<int>& unrevealed,
     const std::vector<int>& pieces,
-    const std::vector<int>& movable_pieces) const
+    const std::vector<int>& movable_pieces,
+    std::vector<double>& public_obs
+) const
 {
-    size_t height = public_obs_info[0].height();
-    size_t width = public_obs_info[0].width();
     size_t num_pieces = pieces.size();
-
-    std::vector<Matrix<double>> result;
-    result.reserve(num_pieces);
+    public_obs.reserve(num_pieces * height_ * width_);
 
     // Суммы для нормализации
     int sum_all = 0;
@@ -205,101 +181,111 @@ const std::vector<Matrix<double>>& StrategoEnv::get_public_obs(
     }
 
     for (size_t i = 0; i < num_pieces; ++i) {
-        Matrix<double> total_obs(height, width, 0.0);
-
-        for (size_t r = 0; r < height; ++r) {
-            for (size_t c = 0; c < width; ++c) {
+        for (size_t r = 0; r < height_; ++r) {
+            for (size_t c = 0; c < width_; ++c) {
                 double val_unmoved = public_obs_info[0](r, c) ? probs_unmoved[i] : 0.0;
                 double val_moved = public_obs_info[1](r, c) ? probs_moved[i] : 0.0;
                 double val_revealed = public_obs_info[2](r, c) && static_cast<int>(pieces[i]) == static_cast<int>(public_obs_info[2](r, c)) ? 1.0 : 0.0;
-
-                total_obs(r, c) = val_unmoved + val_moved + val_revealed;
+                public_obs.push_back(val_unmoved + val_moved + val_revealed);
             }
         }
-
-        result.push_back(std::move(total_obs));
     }
-
-    return result;
 }
 
-const Matrix<double>& StrategoEnv::encode_move(const std::array<Matrix<bool>, 2>& action) const {
-    size_t height = board_.height();
-    size_t width = board_.width();
+void StrategoEnv::encode_move(const Pos& src, const Pos& dest, std::vector<double>& encoding) const {
+    encoding.resize(height_ * width_, 0.0);
+    int8_t src_piece = board_(src[0], src[1]);
+    int8_t dest_piece = board_(dest[0], dest[1]);
 
-    // Вычисляем selected_piece и destination
-    int selected_piece = 0;
-    int destination = 0;
-
-    for (size_t i = 0; i < height; ++i) {
-        for (size_t j = 0; j < width; ++j) {
-            if (action[0](i, j)) {
-                selected_piece += board_(i, j);
-            }
-            if (action[1](i, j)) {
-                destination += board_(i, j);
-            }
-        }
-    }
-
-    // Вычисляем результат
-    Matrix<double> result(height, width, 0.0);
-
-    if (destination == static_cast<int>(Piece::EMPTY)) {
-        for (size_t i = 0; i < height; ++i) {
-            for (size_t j = 0; j < width; ++j) {
-                result(i, j) = static_cast<double>(action[1](i, j)) - static_cast<double>(action[0](i, j));
-            }
-        }
+    if (dest_piece == static_cast<int8_t>(Piece::EMPTY)) {
+        encoding[dest[0] * width_ + dest[1]] = 1.0;
+        encoding[src[0] * width_ + src[1]] = -1.0;
     } else {
-        double weight = 2.0 + (static_cast<double>(selected_piece) - 3.0) / 12.0;
-
-        for (size_t i = 0; i < height; ++i) {
-            for (size_t j = 0; j < width; ++j) {
-                result(i, j) = static_cast<double>(action[1](i, j)) - weight * static_cast<double>(action[0](i, j));
-            }
-        }
+        double weight = 2.0 + (static_cast<double>(src_piece) - 3.0) / 12.0;
+        encoding[dest[0] * width_ + dest[1]] = 1.0;
+        encoding[src[0] * width_ + src[1]] = -weight;
     }
-
-    return result;
 }
 
-std::tuple<std::vector<double>, int, bool, bool> StrategoEnv::step(const Pos& action) {
+std::tuple<std::vector<double>, std::vector<bool>, int, bool, bool> StrategoEnv::step(const Pos& action) {
+    std::pair<bool, std::string> action_valid = validate_coord(action);
+    if (!action_valid.first) {
+        throw std::invalid_argument(action_valid.second);
+    }
+    
     int reward = 0;
     bool terminated = false;
     bool truncated = false;
     
+    std::vector<double> obs;
+    std::vector<bool> action_mask;
+
     switch (game_phase_) {
         case GamePhase::DEPLOY: {
-            // Логика фазы размещения
-            auto valid_spots = valid_spots_to_place();
-            if (valid_spots[action[0] * config_->width() + action[1]] == 0) {
+            valid_spots_to_place(action_mask);
+            if (!action_mask[action[0] * width_ + action[1]]) {
+                // action = action_space_.sample();
                 throw std::invalid_argument("Invalid deployment location");
             }
             
-            auto& player = (current_player_ == Player::RED) ? p1_ : p2_;
-            size_t piece_index = 0;
-            while (player.unrevealed()[piece_index] == 0) piece_index++;
-            
-            board_(action[0], action[1]) = piece_index;
-            player.unrevealed_[piece_index]--;
-            player.set_deploy_idx(player.deploy_idx() + 1);
-            
-            // Проверка завершения фазы размещения
-            if (p1_.deploy_idx() == std::accumulate(p1_.unrevealed().begin(), p1_.unrevealed().end(), 0) &&
-                p2_.deploy_idx() == std::accumulate(p2_.unrevealed().begin(), p2_.unrevealed().end(), 0)) {
-                game_phase_ = GamePhase::SELECT;
+            auto& curr_player = (current_player_ == Player::RED) ? p1_ : p2_;
+            auto& opp_player = (current_player_ == Player::RED) ? p2_ : p1_;
+            size_t deploy_idx = 0, deploy_piece = 0;
+            for (auto piece : allowed_pieces_) {
+                int i = 0;
+                for (; i < curr_player.unrevealed_[piece]; ++i) {
+                    if (deploy_idx == curr_player.deploy_idx_) {
+                        deploy_piece = piece;
+                        break;
+                    }
+                }
+                if (deploy_piece != 0) {
+                    break;
+                } 
+                deploy_idx += i;
             }
             
-            // Смена игрока
+            board_(action[0], action[1]) = deploy_piece;
+            ++curr_player.deploy_idx_;
+
+            bool curr_finish_deploy = curr_player.deploy_idx_ == std::accumulate(curr_player.unrevealed_.begin(), curr_player.unrevealed_.end(), 0);
+            bool opp_finish_deploy = opp_player.deploy_idx_ == std::accumulate(opp_player.unrevealed_.begin(), opp_player.unrevealed_.end(), 0);
+            if (opp_finish_deploy && !curr_finish_deploy) {
+                break;
+            } else if (curr_finish_deploy && opp_finish_deploy) {
+                std::vector<bool> action_mask;
+                valid_pieces_to_select(action_mask, true);
+                bool opp_no_moves = std::any_of(action_mask.begin(), action_mask.end(), [](bool x) { return x; });
+                if (opp_no_moves) {
+                    action_mask.clear();
+                    valid_pieces_to_select(action_mask, false);
+                    bool draw_game = std::any_of(action_mask.begin(), action_mask.end(), [](bool x) { return x; });
+                    game_phase_ = GamePhase::TERMINAL;
+                    reward = draw_game ? 0 : 1;
+                    terminated = true;
+                    break;
+                }
+                game_phase_ = GamePhase::SELECT;
+                for (size_t r = 0; r < height_; ++r) {
+                    for (size_t c = 0; c < width_; ++c) {
+                        if (board_(r, c) > static_cast<int8_t>(Piece::LAKE) && curr_player.deploy_mask_(r, c)) {
+                            curr_player.public_obs_info_[0](r, c) = true;
+                        }
+                        size_t opp_r = height_ - r - 1, opp_c = width_ - c - 1;
+                        if (board_(opp_r, opp_c) < -static_cast<int8_t>(Piece::LAKE) && opp_player.deploy_mask_(opp_r, opp_c)) {
+                            opp_player.public_obs_info_[0](r, c) = true;
+                        }
+                    }
+                }
+            }
+            rotate_board(board_);
             current_player_ = (current_player_ == Player::RED) ? Player::BLUE : Player::RED;
             break;
         }
-        
         case GamePhase::SELECT: {
-            // Логика фазы выбора фигуры
-            auto valid_pieces = valid_pieces_to_select();
-            if (valid_pieces[action[0] * config_->width() + action[1]] == 0) {
+            valid_pieces_to_select(action_mask);
+            if (!action_mask[action[0] * width_ + action[1]]) {
+                // action = action_space_.sample();
                 throw std::invalid_argument("Invalid piece selection");
             }
             
@@ -309,23 +295,42 @@ std::tuple<std::vector<double>, int, bool, bool> StrategoEnv::step(const Pos& ac
             game_phase_ = GamePhase::MOVE;
             break;
         }
-        
         case GamePhase::MOVE: {
-            // Логика фазы движения
             auto src = (current_player_ == Player::RED) ? p1_.last_selected() : p2_.last_selected();
             auto dest = action;
             
             if (!check_action_valid(src, dest)) {
+                // action = action_space_.sample();
+                // dest = action;
                 throw std::invalid_argument("Invalid move");
             }
+
+            auto& curr_player = (current_player_ == Player::RED) ? p1_ : p2_;
+            auto& opp_player = (current_player_ == Player::RED) ? p2_ : p1_;
+
+            curr_player.last_selected_ = action;
+
+            auto selected_piece = board_(src[0], src[1]);
+            auto destination = board_(dest[0], dest[1]);
+
+            if (total_moves_ >= total_moves_limit_ || 
+                moves_since_attack_ >= moves_since_attack_limit_) {
+                terminated = true;
+                rotate_board(board_);
+                current_player_ = (current_player_ == Player::RED) ? Player::BLUE : Player::RED;
+                game_phase_ = GamePhase::TERMINAL;
+                break;
+            }
+
+
             
             // Обновление истории движений
-            update_observation_history(src, dest);
+            // update_observation_history(src, dest);
             
             // Логика захвата и движения
             Piece attacker = static_cast<Piece>(board_(src[0], src[1]));
             Piece defender = static_cast<Piece>(board_(dest[0], dest[1]));
-            handle_capture(attacker, defender, src, dest);
+            // handle_capture(attacker, defender, src, dest);
             
             // Проверка условий победы
             if (defender == Piece::FLAG) {
@@ -338,8 +343,8 @@ std::tuple<std::vector<double>, int, bool, bool> StrategoEnv::step(const Pos& ac
             moves_since_attack_ = (defender == Piece::EMPTY) ? moves_since_attack_ + 1 : 0;
             
             // Проверка условий ничьи
-            if (total_moves_ >= config_->total_moves_limit() || 
-                moves_since_attack_ >= config_->moves_since_attack_limit()) {
+            if (total_moves_ >= total_moves_limit_ || 
+                moves_since_attack_ >= moves_since_attack_limit_) {
                 terminated = true;
                 truncated = true;
             }
@@ -354,7 +359,8 @@ std::tuple<std::vector<double>, int, bool, bool> StrategoEnv::step(const Pos& ac
             throw std::runtime_error("Game has already terminated");
     }
     
-    return {generate_observation(), reward, terminated, truncated};
+    generate_env_state(obs, action_mask);
+    return {std::move(obs), std::move(action_mask), reward, terminated, truncated};
 }
 
 std::tuple<std::vector<double>, int, bool, bool> StrategoEnv::movement_step(const Pos& dest) {
@@ -471,6 +477,15 @@ Matrix<bool> StrategoEnv::valid_destinations() const {
     return {}; // Заглушка
 }
 
+inline std::pair<bool, std::string> StrategoEnv::validate_coord(const Pos& coord) const {
+    if (coord[0] < 0 or coord[0] >= height_) {
+        return {false, "Source row is out of bounds"};
+    } else if (coord[1] < 0 or coord[1] >= width_) {
+        return {false, "Source column is out of bounds"};
+    }
+    return {true, ""};
+}
+
 bool StrategoEnv::check_action_valid(const Pos& src, const Pos& dest) const {
     // Проверка координат
     if (src[0] < 0 || src[0] >= static_cast<int>(config_->height()) ||
@@ -538,4 +553,8 @@ Pos StrategoEnv::get_random_action() const {
         default:
             return {-1, -1};
     }
+}
+
+void StrategoEnv::rotate_board(Matrix<int8_t>& board) {
+    std::reverse(board.data_.begin(), board.data_.end());
 }

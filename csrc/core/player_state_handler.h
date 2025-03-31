@@ -18,7 +18,7 @@ private:
     Matrix<bool> deploy_mask_;
     std::array<Matrix<bool>, 3> public_obs_info_;
     std::vector<int> unrevealed_;
-    std::vector<Matrix<double>> observed_moves_;
+    std::vector<double> observed_moves_;
     Pos last_selected_;
     Piece last_selected_piece_;
 
@@ -44,7 +44,7 @@ public:
     const Matrix<bool>& deploy_mask() const { return deploy_mask_; }
     const std::array<Matrix<bool>, 3>& public_obs_info() const { return public_obs_info_; }
     const std::vector<int>& unrevealed() const { return unrevealed_; }
-    const std::vector<Matrix<double>>& observed_moves() const { return observed_moves_; }
+    const std::vector<double>& observed_moves() const { return observed_moves_; }
     const Pos& last_selected() const { return last_selected_; }
     Piece last_selected_piece() const { return last_selected_piece_; }
     

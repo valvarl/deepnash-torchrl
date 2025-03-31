@@ -257,6 +257,7 @@ class StrategoEnv(Env):
                 action = tuple(self.action_space.sample())
                 # raise ValueError("Invalid Deployment Location")
 
+            raise RuntimeError("Rewrite all below")
             if self.player == Player.RED:
                 self.board[action] = np.repeat(np.arange(len(Piece),), self.p1.unrevealed)[self.p1.deploy_idx]
                 self.p1.deploy_idx += 1
@@ -275,11 +276,13 @@ class StrategoEnv(Env):
                     self.game_phase = GamePhase.TERMINAL
                     return self.generate_env_state(), 0 if draw_game else 1, True, False, self.get_info()
 
+                raise RuntimeError("Rewrite all below")
                 self.game_phase = GamePhase.SELECT
                 if self.player == Player.RED:
                     self.p1.public_obs_info[0, self.board * self.p1.deploy_mask > 0] = 1
                     self.p2.public_obs_info[0, np.rot90(self.board * self.p2.deploy_mask > 0, 2)] = 1
                 else:
+                    raise RuntimeError("Here may be a mistake")
                     self.p1.public_obs_info[0, np.rot90(self.board * self.p1.deploy_mask > 0, 2)] = 1
                     self.p2.public_obs_info[0, self.board * self.p2.deploy_mask > 0] = 1
 
@@ -293,6 +296,7 @@ class StrategoEnv(Env):
                 action = tuple(self.action_space.sample())
                 # raise ValueError("Invalid Piece Selection")
 
+            raise RuntimeError("Rewrite all below")
             if self.player == Player.RED:
                 self.p1.last_selected = action
                 self.p1.last_selected_piece = Piece(self.board[action])

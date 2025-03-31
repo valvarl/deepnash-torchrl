@@ -48,8 +48,11 @@ enum class GamePhase {
     MOVE
 };
 
+class StrategoEnv;
+
 template<typename T>
 class Matrix {
+friend class StrategoEnv;
 private:
     std::vector<T> data_;
     size_t height_;
@@ -71,6 +74,7 @@ public:
 // Специализация для bool
 template<>
 class Matrix<bool> {
+friend class StrategoEnv;
 private:
     std::vector<bool> data_;
     size_t height_;

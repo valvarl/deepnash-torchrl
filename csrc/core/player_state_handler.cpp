@@ -51,7 +51,5 @@ void PlayerStateHandler::generate_state(
     unrevealed_ = pieces_num;
 
     // Initialize observed moves history
-    for (size_t i = 0; i < observed_history_entries; ++i) {
-        observed_moves_.emplace_back(height, width, 0);
-    }
+    observed_moves_.resize(observed_history_entries * height * width);
 }

@@ -11,7 +11,7 @@ PYBIND11_MODULE(stratego_cpp, m) {
              py::arg("config") = nullptr)
         .def("reset", &StrategoEnv::reset, py::arg("seed") = 0)
         .def("step", &StrategoEnv::step)
-        .def("generate_observation", &StrategoEnv::generate_observation)
+        // .def("generate_observation", &StrategoEnv::generate_observation)
         .def_property_readonly("board", &StrategoEnv::board)
         .def_property_readonly("game_phase", &StrategoEnv::game_phase)
         .def_property_readonly("current_player", &StrategoEnv::current_player);
