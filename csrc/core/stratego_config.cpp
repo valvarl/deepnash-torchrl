@@ -28,8 +28,8 @@ const std::vector<std::pair<Pos, Pos>> StrategoConfig::LAKES_ORIGINAL = {
     {std::make_pair<Pos, Pos>(Pos{4, 6}, Pos{5, 7})},
 };
 
-Matrix<bool> StrategoConfig::make_mask(const std::vector<std::pair<Pos, Pos>>& positions) const {
-    Matrix<bool> mask(height_, width_, false);
+std::vector<bool> StrategoConfig::make_mask(const std::vector<std::pair<Pos, Pos>>& positions) const {
+    std::vector<bool> mask(height_ * width_, false);
     
     for (const auto& [top_left, bottom_right] : positions) {
         int y1 = std::min(top_left[0], bottom_right[0]);
@@ -39,7 +39,7 @@ Matrix<bool> StrategoConfig::make_mask(const std::vector<std::pair<Pos, Pos>>& p
         
         for (int y = y1; y <= y2; ++y) {
             for (int x = x1; x <= x2; ++x) {
-                mask(y, x) = true;
+                mask[y * width_ + x] = true;
             }
         }
     }
@@ -51,10 +51,10 @@ std::pair<bool, std::string> StrategoConfig::validate() const {
     // Check deployment overlaps with lakes
     for (size_t y = 0; y < height_; ++y) {
         for (size_t x = 0; x < width_; ++x) {
-            if (p1_deploy_mask_(y, x) && lakes_mask_(y, x)) {
+            if (p1_deploy_mask_[y * width_ + x] && lakes_mask_[y * width_ + x]) {
                 return {false, "Player 1's deployment overlaps with lakes"};
             }
-            if (p2_deploy_mask_(y, x) && lakes_mask_(y, x)) {
+            if (p2_deploy_mask_[y * width_ + x] && lakes_mask_[y * width_ + x]) {
                 return {false, "Player 2's deployment overlaps with lakes"};
             }
         }
@@ -64,7 +64,7 @@ std::pair<bool, std::string> StrategoConfig::validate() const {
         // Check deployment overlaps between players
         for (size_t y = 0; y < height_; ++y) {
             for (size_t x = 0; x < width_; ++x) {
-                if (p1_deploy_mask_(y, x) && p2_deploy_mask_(y, x)) {
+                if (p1_deploy_mask_[y * width_ + x] && p2_deploy_mask_[y * width_ + x]) {
                     return {false, "Player 1's and Player 2's deployments overlap"};
                 }
             }
@@ -76,8 +76,8 @@ std::pair<bool, std::string> StrategoConfig::validate() const {
         
         for (size_t y = 0; y < height_; ++y) {
             for (size_t x = 0; x < width_; ++x) {
-                p1_spots += p1_deploy_mask_(y, x);
-                p2_spots += p2_deploy_mask_(y, x);
+                p1_spots += p1_deploy_mask_[y * width_ + x];
+                p2_spots += p2_deploy_mask_[y * width_ + x];
             }
         }
         
@@ -101,8 +101,8 @@ std::pair<bool, std::string> StrategoConfig::validate() const {
         
         for (size_t y = 0; y < height_; ++y) {
             for (size_t x = 0; x < width_; ++x) {
-                bool p1 = p1_deploy_mask_(y, x);
-                bool p2 = p2_deploy_mask_(y, x);
+                bool p1 = p1_deploy_mask_[y * width_ + x];
+                bool p2 = p2_deploy_mask_[y * width_ + x];
                 
                 if (p1 && !p2) p1_own++;
                 if (p2 && !p1) p2_own++;
@@ -146,9 +146,9 @@ StrategoConfig::StrategoConfig(
     const std::vector<std::pair<Pos, Pos>>& lakes,
     const std::vector<std::pair<Pos, Pos>>& p1_places_to_deploy,
     const std::vector<std::pair<Pos, Pos>>& p2_places_to_deploy,
-    const Matrix<bool>& lakes_mask,
-    const Matrix<bool>& p1_deploy_mask,
-    const Matrix<bool>& p2_deploy_mask,
+    const std::vector<bool>& lakes_mask,
+    const std::vector<bool>& p1_deploy_mask,
+    const std::vector<bool>& p2_deploy_mask,
     int total_moves_limit,
     int moves_since_attack_limit,
     int observed_history_entries,
@@ -157,9 +157,9 @@ StrategoConfig::StrategoConfig(
 ) : height_(height), width_(width),
     p1_pieces_(p1_pieces),
     p2_pieces_(p2_pieces.empty() ? p1_pieces : p2_pieces),
-    lakes_mask_(lakes_mask.height() == 0 ? make_mask(lakes) : lakes_mask),
-    p1_deploy_mask_(p1_deploy_mask.height() == 0 ? make_mask(p1_places_to_deploy) : p1_deploy_mask),
-    p2_deploy_mask_(p2_deploy_mask.height() == 0 ? make_mask(p2_places_to_deploy) : p2_deploy_mask),
+    lakes_mask_(lakes_mask.size() == 0 ? make_mask(lakes) : lakes_mask),
+    p1_deploy_mask_(p1_deploy_mask.size() == 0 ? make_mask(p1_places_to_deploy) : p1_deploy_mask),
+    p2_deploy_mask_(p2_deploy_mask.size() == 0 ? make_mask(p2_places_to_deploy) : p2_deploy_mask),
     total_moves_limit_(total_moves_limit),
     moves_since_attack_limit_(moves_since_attack_limit),
     observed_history_entries_(observed_history_entries),
@@ -199,7 +199,7 @@ StrategoConfig StrategoConfig::from_game_mode(GameMode mode) {
                 LAKES_ORIGINAL,
                 PLACES_TO_DEPLOY_RED_ORIGINAL,
                 PLACES_TO_DEPLOY_BLUE_ORIGINAL,
-                Matrix<bool>(0, 0), Matrix<bool>(0, 0), Matrix<bool>(0, 0),
+                {}, {}, {},
                 2000, 200, 40, false, GameMode::ORIGINAL
             );
         case GameMode::BARRAGE:
@@ -210,64 +210,10 @@ StrategoConfig StrategoConfig::from_game_mode(GameMode mode) {
                 LAKES_ORIGINAL,
                 PLACES_TO_DEPLOY_RED_ORIGINAL,
                 PLACES_TO_DEPLOY_BLUE_ORIGINAL,
-                Matrix<bool>(0, 0), Matrix<bool>(0, 0), Matrix<bool>(0, 0),
+                {}, {}, {},
                 2000, 200, 40, false, GameMode::BARRAGE
             );
         default:
             throw std::invalid_argument("Unknown game mode");
     }
-}
-
-StrategoConfig StrategoConfig::rot90(int k) const {
-    k = k % 4;
-    if (k < 0) k += 4;
-    
-    size_t new_height = (k % 2 == 0) ? height_ : width_;
-    size_t new_width = (k % 2 == 0) ? width_ : height_;
-    
-    auto rotate_mask = [k, new_height, new_width](const Matrix<bool>& mask) {
-        Matrix<bool> rotated(new_height, new_width);
-        for (size_t y = 0; y < mask.height(); ++y) {
-            for (size_t x = 0; x < mask.width(); ++x) {
-                size_t new_y, new_x;
-                switch (k) {
-                    case 1: // 90 degrees
-                        new_y = x;
-                        new_x = mask.height() - 1 - y;
-                        break;
-                    case 2: // 180 degrees
-                        new_y = mask.height() - 1 - y;
-                        new_x = mask.width() - 1 - x;
-                        break;
-                    case 3: // 270 degrees
-                        new_y = mask.width() - 1 - x;
-                        new_x = y;
-                        break;
-                    default: // 0 degrees
-                        new_y = y;
-                        new_x = x;
-                        break;
-                }
-                rotated(new_y, new_x) = mask(y, x);
-            }
-        }
-        return rotated;
-    };
-    
-    return StrategoConfig(
-        new_height, new_width,
-        p1_pieces_,
-        p2_pieces_,
-        {}, // positions will be ignored since we provide masks
-        {},
-        {},
-        rotate_mask(lakes_mask_),
-        rotate_mask(p1_deploy_mask_),
-        rotate_mask(p2_deploy_mask_),
-        total_moves_limit_,
-        moves_since_attack_limit_,
-        observed_history_entries_,
-        allow_competitive_deploy_,
-        game_mode_
-    );
 }

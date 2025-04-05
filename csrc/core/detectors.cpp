@@ -9,12 +9,12 @@ bool ChasingDetector::is_adjacent(const Pos& pos1, const Pos& pos2) const {
 }
 
 bool ChasingDetector::is_on_same_line(const Pos& pos1, const Pos& pos2,
-                                     const Matrix<int8_t>& board) const {
+                                     const std::vector<int8_t>& board, size_t height, size_t width) const {
     if (pos1[0] == pos2[0]) {
         int min_col = std::min(pos1[1], pos2[1]);
         int max_col = std::max(pos1[1], pos2[1]);
         for (int col = min_col + 1; col < max_col; ++col) {
-            if (board(pos1[0], col) != static_cast<int8_t>(Piece::EMPTY)) {
+            if (board[pos1[0] * width + col] != static_cast<int8_t>(Piece::EMPTY)) {
                 return false;
             }
         }
@@ -24,7 +24,7 @@ bool ChasingDetector::is_on_same_line(const Pos& pos1, const Pos& pos2,
         int min_row = std::min(pos1[0], pos2[0]);
         int max_row = std::max(pos1[0], pos2[0]);
         for (int row = min_row + 1; row < max_row; ++row) {
-            if (board(row, pos1[1]) != static_cast<int8_t>(Piece::EMPTY)) {
+            if (board[row * width + pos1[1]] != static_cast<int8_t>(Piece::EMPTY)) {
                 return false;
             }
         }
@@ -36,16 +36,16 @@ bool ChasingDetector::is_on_same_line(const Pos& pos1, const Pos& pos2,
 bool ChasingDetector::check_chasing_condition(Piece verified_piece,
                                             const Pos& verified_pos,
                                             const Pos& opponent_pos,
-                                            const Matrix<int8_t>& board) const {
+                                            const std::vector<int8_t>& board, size_t height, size_t width) const {
     if (verified_piece != Piece::SCOUT) {
         return is_adjacent(verified_pos, opponent_pos);
     } else {
-        return is_on_same_line(verified_pos, opponent_pos, board);
+        return is_on_same_line(verified_pos, opponent_pos, board, height, width);
     }
 }
 
 std::pair<bool, std::vector<Pos>> ChasingDetector::validate_select(
-    Player player, Piece piece, const Pos& pos, const Matrix<int8_t>& board) const {
+    Player player, Piece piece, const Pos& pos, const std::vector<int8_t>& board, size_t height, size_t width) const {
     
     if (chase_moves_.empty() || chase_moves_.back().attacker) {
         return {true, {}};
@@ -59,7 +59,7 @@ std::pair<bool, std::vector<Pos>> ChasingDetector::validate_select(
         if (chasing_move.player == player && 
             chasing_move.piece == piece &&
             chased_move.from_pos == chase_moves_.back().to_pos &&
-            check_chasing_condition(piece, pos, chasing_move.to_pos, board)) {
+            check_chasing_condition(piece, pos, chasing_move.to_pos, board, height, width)) {
             
             if ((chase_moves_.size() - 1) / 2 == i + 1 && 
                 chase_moves_[chase_moves_.size() - 2].from_pos == chasing_move.to_pos) {
@@ -76,15 +76,15 @@ std::pair<bool, std::vector<Pos>> ChasingDetector::validate_select(
 
 bool ChasingDetector::validate_move(Player player, Piece piece, 
                                   const Pos& from_pos, const Pos& to_pos,
-                                  const Matrix<int8_t>& board) const {
-    auto [valid, forbidden] = validate_select(player, piece, from_pos, board);
+                                  const std::vector<int8_t>& board, size_t height, size_t width) const {
+    auto [valid, forbidden] = validate_select(player, piece, from_pos, board, height, width);
     if (valid) return true;
     return std::find(forbidden.begin(), forbidden.end(), to_pos) == forbidden.end();
 }
 
 void ChasingDetector::update(Player player, Piece piece,
                             const Pos& from_pos, const Pos& to_pos,
-                            const Matrix<int8_t>& board) {
+                            const std::vector<int8_t>& board, size_t height, size_t width) {
     if (chase_moves_.empty()) {
         chase_moves_.emplace_back(player, piece, from_pos, to_pos);
         return;
@@ -96,7 +96,7 @@ void ChasingDetector::update(Player player, Piece piece,
         chase_moves_ = {chase_moves_.back()};
         chase_moves_.back().attacker = true;
     } else if (chase_moves_.back().attacker && 
-               check_chasing_condition(piece, to_pos, chase_moves_.back().to_pos, board)) {
+               check_chasing_condition(piece, to_pos, chase_moves_.back().to_pos, board, height, width)) {
         // Initiative handover
         chase_moves_ = {ChaseEntry(player, piece, from_pos, to_pos)};
         return;
@@ -106,11 +106,11 @@ void ChasingDetector::update(Player player, Piece piece,
         chase_moves_.back().attacker ? chase_moves_.back().piece : piece,
         chase_moves_.back().attacker ? to_pos : from_pos,
         chase_moves_.back().to_pos,
-        board)) {
+        board, height, width)) {
         
         // Chase continues
         if (!chase_moves_.back().attacker && 
-            !validate_move(player, piece, from_pos, to_pos, board)) {
+            !validate_move(player, piece, from_pos, to_pos, board, height, width)) {
             throw std::runtime_error("Invalid chasing move");
         }
         chase_moves_.emplace_back(player, piece, from_pos, to_pos, !chase_moves_.back().attacker);

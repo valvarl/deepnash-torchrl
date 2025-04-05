@@ -15,21 +15,11 @@ void roll(std::vector<double>& vec, int shift) {
     std::rotate(vec.begin(), vec.begin() + (vec.size() - shift), vec.end());
 }
 
-void rotate_plane(std::vector<double>& vec) {
-    if (vec.empty()) return;
-    std::reverse(vec.begin(), vec.end());
-    for (auto& elem : vec) {
-        elem *= -1;
-    }
-}
-
 StrategoEnv::StrategoEnv(std::shared_ptr<StrategoConfig> config, uint32_t seed)
     : config_(std::move(config)),
       game_phase_(GamePhase::TERMINAL),
       height_(config_->height()),
       width_(config_->width()),
-      board_(height_, width_, static_cast<int8_t>(Piece::EMPTY)),
-      lakes_(height_, width_, false),
       p1_(Player::RED),
       p2_(Player::BLUE),
       action_space_({0, 0})
@@ -50,7 +40,7 @@ void StrategoEnv::reset(uint32_t seed) {
 
     game_phase_ = GamePhase::DEPLOY;
     current_player_ = Player::RED;
-    board_ = Matrix<int8_t>(height_, width_, static_cast<int8_t>(Piece::EMPTY)),
+    board_ = std::vector<int8_t>(height_ * width_, static_cast<int8_t>(Piece::EMPTY)),
     lakes_ = config_->lakes_mask();
 
     total_moves_limit_ = config_->total_moves_limit();
@@ -62,12 +52,12 @@ void StrategoEnv::reset(uint32_t seed) {
 
     allowed_pieces_ = config_->allowed_pieces();
 
-    board_ = Matrix<int8_t>(height_, width_, static_cast<int8_t>(Piece::EMPTY));
+    board_ = std::vector<int8_t>(height_ * width_, static_cast<int8_t>(Piece::EMPTY));
     lakes_ = config_->lakes_mask();
     for (size_t i = 0; i < height_; ++i) {
         for (size_t j = 0; j < width_; ++j) {
-            if (lakes_(i, j)) {
-                board_(i, j) = static_cast<int8_t>(Piece::LAKE);
+            if (lakes_[i * width_ + j]) {
+                board_[i * width_ + j] = static_cast<int8_t>(Piece::LAKE);
             }
         }
     }
@@ -98,7 +88,7 @@ void StrategoEnv::generate_observation(std::vector<double> &obs) const {
     // 1. Lakes
     for (size_t i = 0; i < height_; ++i) {
         for (size_t j = 0; j < width_; ++j) {
-            obs.push_back(lakes_(i, j) ? 1.0 : 0.0);
+            obs.push_back(lakes_[i * width_ + j] ? 1.0 : 0.0);
         }
     }
 
@@ -106,7 +96,7 @@ void StrategoEnv::generate_observation(std::vector<double> &obs) const {
     for (int piece_val : allowed_pieces_) {
         for (size_t i = 0; i < height_; ++i) {
             for (size_t j = 0; j < width_; ++j) {
-                int8_t val = board_(i, j);
+                int8_t val = board_[i * width_ + j];
                 bool active_piece = val > static_cast<int8_t>(Piece::LAKE);
                 obs.push_back((active_piece && val == piece_val) ? 1.0 : 0.0);
             }
@@ -125,9 +115,9 @@ void StrategoEnv::generate_observation(std::vector<double> &obs) const {
         get_public_obs(opp.public_obs_info(), opp.unrevealed(), opp.pieces(), opp.movable_pieces(), opp_public_obs);
         (current_player_ == Player::RED ? p1_ : p2_).observed_moves();
         
-        obs.emplace_back(public_obs);
-        obs.emplace_back(opp_public_obs);
-        obs.emplace_back(move_matrix);
+        obs.insert(obs.end(), public_obs.begin(), public_obs.end());
+        obs.insert(obs.end(), opp_public_obs.begin(), opp_public_obs.end());
+        obs.insert(obs.end(), move_matrix.begin(), move_matrix.end());
     }
 
     // 4. Scalar info
@@ -168,7 +158,7 @@ void StrategoEnv::generate_env_state(
 }
 
 void StrategoEnv::get_public_obs(
-    const std::array<Matrix<bool>, 3>& public_obs_info,
+    const std::array<std::vector<bool>, 3>& public_obs_info,
     const std::vector<int>& unrevealed,
     const std::vector<int>& pieces,
     const std::vector<int>& movable_pieces,
@@ -202,9 +192,10 @@ void StrategoEnv::get_public_obs(
     for (size_t i = 0; i < num_pieces; ++i) {
         for (size_t r = 0; r < height_; ++r) {
             for (size_t c = 0; c < width_; ++c) {
-                double val_unmoved = public_obs_info[0](r, c) ? probs_unmoved[i] : 0.0;
-                double val_moved = public_obs_info[1](r, c) ? probs_moved[i] : 0.0;
-                double val_revealed = public_obs_info[2](r, c) && static_cast<int>(pieces[i]) == static_cast<int>(public_obs_info[2](r, c)) ? 1.0 : 0.0;
+                double val_unmoved = public_obs_info[0][r * width_ + c] ? probs_unmoved[i] : 0.0;
+                double val_moved = public_obs_info[1][r * width_ + c] ? probs_moved[i] : 0.0;
+                double val_revealed = public_obs_info[2][r * width_ + c] && 
+                    static_cast<int>(pieces[i]) == static_cast<int>(public_obs_info[2][r * width_ + c]) ? 1.0 : 0.0;
                 public_obs.push_back(val_unmoved + val_moved + val_revealed);
             }
         }
@@ -213,8 +204,8 @@ void StrategoEnv::get_public_obs(
 
 void StrategoEnv::encode_move(const Pos& src, const Pos& dest, std::vector<double>& encoding) const {
     encoding.resize(height_ * width_, 0.0);
-    int8_t src_piece = board_(src[0], src[1]);
-    int8_t dest_piece = board_(dest[0], dest[1]);
+    int8_t src_piece = board_[src[0] * width_ + src[1]];
+    int8_t dest_piece = board_[dest[0] * width_ + dest[1]];
 
     if (dest_piece == static_cast<int8_t>(Piece::EMPTY)) {
         encoding[dest[0] * width_ + dest[1]] = 1.0;
@@ -264,7 +255,7 @@ std::tuple<std::vector<double>, std::vector<bool>, int, bool, bool> StrategoEnv:
                 deploy_idx += i;
             }
             
-            board_(action[0], action[1]) = deploy_piece;
+            board_[action[0] * width_ + action[1]] = deploy_piece;
             ++curr_player.deploy_idx_;
 
             bool curr_finish_deploy = curr_player.deploy_idx_ == std::accumulate(curr_player.unrevealed_.begin(), curr_player.unrevealed_.end(), 0);
@@ -287,17 +278,17 @@ std::tuple<std::vector<double>, std::vector<bool>, int, bool, bool> StrategoEnv:
                 game_phase_ = GamePhase::SELECT;
                 for (size_t r = 0; r < height_; ++r) {
                     for (size_t c = 0; c < width_; ++c) {
-                        if (board_(r, c) > static_cast<int8_t>(Piece::LAKE) && curr_player.deploy_mask_(r, c)) {
-                            curr_player.public_obs_info_[0](r, c) = true;
+                        if (board_[r * width_ + c] > static_cast<int8_t>(Piece::LAKE) && curr_player.deploy_mask_[r * width_ + c]) {
+                            curr_player.public_obs_info_[0][r * width_ + c] = true;
                         }
                         size_t opp_r = height_ - r - 1, opp_c = width_ - c - 1;
-                        if (board_(opp_r, opp_c) < -static_cast<int8_t>(Piece::LAKE) && opp_player.deploy_mask_(opp_r, opp_c)) {
-                            opp_player.public_obs_info_[0](r, c) = true;
+                        if (board_[opp_r * width_ + opp_c] < -static_cast<int8_t>(Piece::LAKE) && opp_player.deploy_mask_[opp_r * width_ + opp_c]) {
+                            opp_player.public_obs_info_[0][r * width_ + c] = true;
                         }
                     }
                 }
             }
-            rotate_board(board_);
+            rotate_tile_inplace<int8_t>(board_);
             current_player_ = (current_player_ == Player::RED) ? Player::BLUE : Player::RED;
             break;
         }
@@ -310,7 +301,7 @@ std::tuple<std::vector<double>, std::vector<bool>, int, bool, bool> StrategoEnv:
             
             auto& player = (current_player_ == Player::RED) ? p1_ : p2_;
             player.set_last_selected(action);
-            player.set_last_selected_piece(static_cast<Piece>(board_(action[0], action[1])));
+            player.set_last_selected_piece(static_cast<Piece>(board_[action[0] * width_ + action[1]]));
             game_phase_ = GamePhase::MOVE;
             break;
         }
@@ -330,14 +321,14 @@ std::tuple<std::vector<double>, std::vector<bool>, int, bool, bool> StrategoEnv:
 
             curr_player.last_selected_ = action;
 
-            int8_t src_piece_val = board_(src[0], src[1]);
-            int8_t dest_piece_val = board_(dest[0], dest[1]);
+            int8_t src_piece_val = board_[src[0] * width_ + src[1]];
+            int8_t dest_piece_val = board_[dest[0] * width_ + dest[1]];
             
             // Check if draw conditions are met
             if (total_moves_ >= total_moves_limit_ || 
                 moves_since_attack_ >= moves_since_attack_limit_) {
                 terminated = true;
-                rotate_board(board_);
+                rotate_tile_inplace<int8_t>(board_);
                 current_player_ = (current_player_ == Player::RED) ? Player::BLUE : Player::RED;
                 game_phase_ = GamePhase::TERMINAL;
                 break;
@@ -353,29 +344,29 @@ std::tuple<std::vector<double>, std::vector<bool>, int, bool, bool> StrategoEnv:
             std::vector<double> move;
             encode_move(src, dest, move);
             std::copy(move.begin(), move.end(), curr_player.observed_moves_.begin());
-            rotate_plane(move);
+            rotate_tile_inplace<double>(move);
             std::copy(move.begin(), move.end(), opp_player.observed_moves_.begin());
 
             two_square_detector_.update(current_player_, static_cast<Piece>(src_piece_val), src, dest);
-            Pos src_rot = {static_cast<int8_t>(height_ - src[0] - 1), static_cast<int8_t>(width_ - src[1] - 1)};
-            Pos dest_rot = {static_cast<int8_t>(height_ - dest[0] - 1), static_cast<int8_t>(width_ - dest[1] - 1)};
+            Pos src_rot = rotate_coord(src);
+            Pos dest_rot = rotate_coord(dest);
             
             auto _src = src, _dest = dest;
             if (current_player_ == Player::BLUE) {
                 _src = src_rot;
                 _dest = dest_rot;
             }
-            chasing_detector_.update(current_player_, static_cast<Piece>(src_piece_val), _src, _dest, board_);
+            chasing_detector_.update(current_player_, static_cast<Piece>(src_piece_val), _src, _dest, board_, height_, width_);
 
             if (src_piece_val = -dest_piece_val) { // Equal Strength
                 // remove both pieces
-                board_(src[0], src[1]) = 0;
-                board_(dest[0], dest[1]) = 0;
+                board_[src[0] * width_ + src[1]] = 0;
+                board_[dest[0] * width_ + dest[1]] = 0;
                 for (int k = 0; k < 3; ++k) {
-                    curr_player.public_obs_info_[k](src[0], src[1]) = 0;
-                    curr_player.public_obs_info_[k](dest[0], dest[1]) = 0;
-                    opp_player.public_obs_info_[k](src_rot[0], src_rot[1]) = 0;
-                    opp_player.public_obs_info_[k](dest_rot[0], dest_rot[1]) = 0;
+                    curr_player.public_obs_info_[k][src[0] * width_ + src[1]] = 0;
+                    curr_player.public_obs_info_[k][dest[0] * width_ + dest[1]] = 0;
+                    opp_player.public_obs_info_[k][src_rot[0] * width_ + src_rot[1]] = 0;
+                    opp_player.public_obs_info_[k][dest_rot[0] * width_ + dest_rot[1]] = 0;
                 }
                 curr_player.unrevealed_[src_piece_val]--;
                 opp_player.unrevealed_[dest_piece_val]--;
@@ -384,25 +375,25 @@ std::tuple<std::vector<double>, std::vector<bool>, int, bool, bool> StrategoEnv:
                         dest_piece_val != -static_cast<int8_t>(Piece::BOMB))) ||  // attacker is stronger (+Bomb case)
                        (dest_piece_val == -static_cast<int8_t>(Piece::FLAG))) {  // enemy Flag found
                 // remove enemy piece
-                board_(src[0], src[1]) = 0;
-                board_(dest[0], dest[1]) = src_piece_val;
+                board_[src[0] * width_ + src[1]] = 0;
+                board_[dest[0] * width_ + dest[1]] = src_piece_val;
                 for (int k = 0; k < 3; ++k) {
-                    curr_player.public_obs_info_[k](src[0], src[1]) = 0;
+                    curr_player.public_obs_info_[k][src[0] * width_ + src[1]] = 0;
                 }
                 if (dest_piece_val != static_cast<int8_t>(Piece::EMPTY)) {
-                    curr_player.public_obs_info_[2](dest[0], dest[1]) = src_piece_val;
+                    curr_player.public_obs_info_[2][dest[0] * width_ + dest[1]] = src_piece_val;
                     for (int k = 0; k < 3; ++k) {
-                        opp_player.public_obs_info_[k](dest_rot[0], dest_rot[1]) = 0;
+                        opp_player.public_obs_info_[k][dest_rot[0] * width_ + dest_rot[1]] = 0;
                     }
                     curr_player.unrevealed_[src_piece_val]--;
                     opp_player.unrevealed_[dest_piece_val]--;
                 } else {
                     bool scout_move = (src[0] == dest[0] && abs(src[1] - dest[1]) > 1) || (src[1] == dest[1] && abs(src[0] - dest[0]) > 1);
                     if (scout_move) {
-                        curr_player.public_obs_info_[2](dest[0], dest[1]) = src_piece_val;
+                        curr_player.public_obs_info_[2][dest[0] * width_ + dest[1]] = src_piece_val;
                         curr_player.unrevealed_[src_piece_val]--;
                     } else {
-                        curr_player.public_obs_info_[1](dest[0], dest[1]) = 1;
+                        curr_player.public_obs_info_[1][dest[0] * width_ + dest[1]] = 1;
                     }
                 }
                 if (dest_piece_val == -static_cast<int8_t>(Piece::FLAG)) {
@@ -411,19 +402,19 @@ std::tuple<std::vector<double>, std::vector<bool>, int, bool, bool> StrategoEnv:
                 }
             } else if (src_piece_val < -dest_piece_val || dest_piece_val == -static_cast<int8_t>(Piece::BOMB)) {
                 // remove attacker
-                board_(src[0], src[1]) = 0;
+                board_[src[0] * width_ + src[1]] = 0;
                 for (int k = 0; k < 3; ++k) {
-                    curr_player.public_obs_info_[k](src[0], src[1]) = 0;
+                    curr_player.public_obs_info_[k][src[0] * width_ + src[1]] = 0;
                 }
                 for (int k = 0; k < 2; ++k) {
-                    opp_player.public_obs_info_[k](dest_rot[0], dest_rot[1]) = 0;
+                    opp_player.public_obs_info_[k][dest_rot[0] * width_ + dest_rot[1]] = 0;
                 }
-                opp_player.public_obs_info_[2](dest_rot[0], dest_rot[1]) = dest_piece_val;
+                opp_player.public_obs_info_[2][dest_rot[0] * width_ + dest_rot[1]] = dest_piece_val;
                 curr_player.unrevealed_[src_piece_val]--;
                 opp_player.unrevealed_[dest_piece_val]--;
             }
             
-            rotate_board(board_);
+            rotate_tile_inplace<int8_t>(board_);
             current_player_ = (current_player_ == Player::RED) ? Player::BLUE : Player::RED;
 
             // Check if any pieces can be moved. If one player has no movable pieces, the other player wins.
@@ -474,8 +465,8 @@ std::pair<bool, std::string> StrategoEnv::check_action_valid(const Pos& src, con
         return valid;
     }
     
-    int8_t src_piece_val = board_(src[0], src[1]);
-    int8_t dest_piece_val = board_(dest[0], dest[1]);
+    int8_t src_piece_val = board_[src[0] * width_ + src[1]];
+    int8_t dest_piece_val = board_[dest[0] * width_ + dest[1]];
 
     if (src_piece_val < static_cast<int8_t>(Piece::SPY)) {
         return {false, "Selected piece cannot be moved by player"};
@@ -499,13 +490,13 @@ std::pair<bool, std::string> StrategoEnv::check_action_valid(const Pos& src, con
         }
         if (src[0] == dest[0]) {
             for (auto i = std::min(src[1], dest[1]) + 1; i < std::max(src[1], dest[1]); ++i) {
-                if (board_(src[0], i) != 0) {
+                if (board_[src[0] * width_ + i] != 0) {
                     return {false, "Pieces in the path of scout"};
                 }
             }
         } else if (src[1] == dest[1]) {
             for (auto i = std::min(src[0], dest[0]) + 1; i < std::max(src[0], dest[0]); ++i) {
-                if (board_(i, src[1]) != 0) {
+                if (board_[i * width_ + src[1]] != 0) {
                     return {false, "Pieces in the path of scout"};
                 }
             }
@@ -520,10 +511,10 @@ std::pair<bool, std::string> StrategoEnv::check_action_valid(const Pos& src, con
 
     auto src_ = src, dest_ = dest;
     if (current_player_ == Player::BLUE) {
-        src_ = {static_cast<int8_t>(height_ - src[0] - 1), static_cast<int8_t>(width_ - src[1] - 1)};
-        dest_ = {static_cast<int8_t>(height_ - dest[0] - 1), static_cast<int8_t>(width_ - dest[1] - 1)};
+        src_ = rotate_coord(src);
+        dest_ = rotate_coord(dest);
     }
-    if (!chasing_detector_.validate_move(current_player_, Piece(src_piece_val), src_, dest_, board_)) {
+    if (!chasing_detector_.validate_move(current_player_, Piece(src_piece_val), src_, dest_, board_, height_, width_)) {
         return {false, "More-square rule violation"};
     }
     
@@ -536,19 +527,161 @@ void StrategoEnv::valid_spots_to_place(std::vector<bool>& action_mask) const {
     
     for (size_t y = 0; y < height_; ++y) {
         for (size_t x = 0; x < width_; ++x) {
-            if (board_(y, x) == static_cast<int8_t>(Piece::EMPTY) && deploy_mask(y, x)) {
+            if (board_[y * width_ + x] == static_cast<int8_t>(Piece::EMPTY) && deploy_mask[y * width_ + x]) {
                 action_mask[y * width_ + x] = true;
             }
         }
     }
 }
 
-void StrategoEnv::valid_pieces_to_select(std::vector<bool>& action_mask, bool is_other_player = false) const {
-    auto board = board_;
+void StrategoEnv::valid_pieces_to_select(std::vector<bool>& action_mask, bool is_other_player) const {
+    action_mask.clear();
+    action_mask.resize(height_ * width_, false);
+
+    // Get the appropriate board view
+    std::vector<int8_t> board_view = board_;
     if (is_other_player) {
-        rotate_board(board);
+        board_view = rotate_tile<int8_t>(board_, true);
     }
 
+    // Create padded board with lakes around the edges
+    std::vector<int8_t> padded_board((height_ + 2) * (width_ + 2), static_cast<int8_t>(Piece::LAKE));
+    for (size_t i = 0; i < height_; ++i) {
+        for (size_t j = 0; j < width_; ++j) {
+            padded_board[(i + 1) * width_ + j + 1] = board_view[i * width_ + j];
+            if (padded_board[(i + 1) * width_ + j + 1] == -static_cast<int8_t>(Piece::LAKE)) {
+                padded_board[(i + 1) * width_ + j + 1] = static_cast<int8_t>(Piece::LAKE);
+            }
+        }
+    }
+
+    // Check for surrounded pieces
+    std::vector<bool> surrounded(height_ * width_, false);
+    for (size_t i = 0; i < height_; ++i) {
+        for (size_t j = 0; j < width_; ++j) {
+            bool left = padded_board[(i + 1) * width_ + j] >= static_cast<int8_t>(Piece::LAKE);
+            bool right = padded_board[(i + 1) * width_ + j + 2] >= static_cast<int8_t>(Piece::LAKE);
+            bool up = padded_board[i * width_ + j + 1] >= static_cast<int8_t>(Piece::LAKE);
+            bool down = padded_board[(i + 2) * width_ + j + 1] >= static_cast<int8_t>(Piece::LAKE);
+            
+            surrounded[i * width_ + j] = left && right && up && down;
+        }
+    }
+
+    // Handle two-square and chasing rules if there's a last selected piece
+    Player player = is_other_player ? 
+        (current_player_ == Player::RED ? Player::BLUE : Player::RED) : 
+        current_player_;
+    
+    const PlayerStateHandler& p = (player == Player::RED) ? p1_ : p2_;
+    Pos last_pos = p.last_selected();
+    Piece last_piece = p.last_selected_piece();
+
+    if (last_pos[0] != -1 && last_pos[1] != -1) {
+        // Check two-square rule
+        auto two_square_valid = two_square_detector_.validate_select(
+            player, last_piece, last_pos);
+        
+        // Check chasing rule
+        Pos rotated_last_pos = last_pos;
+        if (player == Player::BLUE) {
+            rotated_last_pos = rotate_coord(last_pos);
+        }
+        auto chasing_valid = chasing_detector_.validate_select(
+            player, last_piece, rotated_last_pos, board_view, height_, width_);
+
+        if (!two_square_valid.first || !chasing_valid.first) {
+            std::vector<bool> restricted_mask(height_ * width_, false);
+
+            // Apply two-square restrictions
+            if (!two_square_valid.first) {
+                Pos start_pos = two_square_valid.second.first;
+                Pos end_pos = two_square_valid.second.second;
+                
+                if (start_pos == end_pos) {
+                    restricted_mask[start_pos[0] * width_ + start_pos[1]] = true;
+                } else {
+                    if (start_pos[0] == end_pos[0]) {
+                        int min_col = std::min(start_pos[1], end_pos[1]);
+                        int max_col = std::max(start_pos[1], end_pos[1]);
+                        for (int j = min_col; j <= max_col; ++j) {
+                            restricted_mask[start_pos[0] * width_ + j] = true;
+                        }
+                    } else {
+                        int min_row = std::min(start_pos[0], end_pos[0]);
+                        int max_row = std::max(start_pos[0], end_pos[0]);
+                        for (int i = min_row; i <= max_row; ++i) {
+                            restricted_mask[i * width_ + start_pos[1]] = true;
+                        }
+                    }
+                }
+            }
+
+            // Apply chasing restrictions
+            if (!chasing_valid.first) {
+                for (const Pos& pos : chasing_valid.second) {
+                    Pos actual_pos = pos;
+                    if (player == Player::BLUE) {
+                        actual_pos = rotate_coord(pos);
+                    }
+                    restricted_mask[actual_pos[0] * width_ + actual_pos[1]] = true;
+                }
+            }
+
+            // Check if piece is completely surrounded considering restrictions
+            int surrounded_count = 0;
+            const std::array<std::pair<int, int>, 4> directions = {{
+                {-1, 0}, {1, 0}, {0, -1}, {0, 1}
+            }};
+
+            for (const auto& dir : directions) {
+                Pos check_pos = {last_pos[0] + dir.first, last_pos[1] + dir.second};
+                
+                while (check_pos[0] >= 0 && check_pos[0] < height_ && 
+                       check_pos[1] >= 0 && check_pos[1] < width_) {
+                    if (!restricted_mask[check_pos[0] * width_ + check_pos[1]]) {
+                        int8_t piece_val = board_view[check_pos[0] * width_ + check_pos[1]];
+                        if (piece_val >= static_cast<int8_t>(Piece::LAKE) || 
+                            piece_val == -static_cast<int8_t>(Piece::LAKE)) {
+                            surrounded_count++;
+                        }
+                        break;
+                    } else if (last_piece == Piece::SCOUT && 
+                               board_view[check_pos[0] * width_ + check_pos[1]] <= -static_cast<int8_t>(Piece::SPY)) {
+                        surrounded_count++;
+                        break;
+                    }
+
+                    if (last_piece != Piece::SCOUT) {
+                        if (restricted_mask[check_pos[0] * width_ + check_pos[1]]) {
+                            surrounded_count++;
+                        }
+                        break;
+                    }
+                    
+                    check_pos = {static_cast<int8_t>(check_pos[0] + dir.first), static_cast<int8_t>(check_pos[1] + dir.second)};
+                } 
+
+                if (check_pos[0] < 0 || check_pos[0] >= height_ ||
+                    check_pos[1] < 0 || check_pos[1] >= width_) {
+                    surrounded_count++;
+                }
+            }
+
+            if (surrounded_count == 4) {
+                surrounded[last_pos[0] * width_ + last_pos[1]] = true;
+            }
+        }
+    }
+
+    // Create final action mask
+    for (size_t i = 0; i < height_; ++i) {
+        for (size_t j = 0; j < width_; ++j) {
+            if (board_view[i * width_ + j] >= static_cast<int8_t>(Piece::SPY) && !surrounded[i * width_ + j]) {
+                action_mask[i * width_ + j] = true;
+            }
+        }
+    }
 }
 
 void StrategoEnv::valid_destinations(std::vector<bool>& action_mask) const {
@@ -558,44 +691,129 @@ void StrategoEnv::valid_destinations(std::vector<bool>& action_mask) const {
     if (game_phase_ != GamePhase::MOVE) {
         return;
     }
-    auto& selected = current_player_ == Player::RED ? p1_.last_selected_ : p2_.last_selected_;
-    auto selected_piece_val = board_(selected[0], selected[1]);
 
-    std::vector<bool> two_square_mask;
-    auto valid_two_square = two_square_detector_.validate_select(current_player_, Piece(selected_piece_val), selected);
-    if (!valid_two_square.first) {
-        two_square_mask.resize(height_ * width_, true);
-        auto positions = valid_two_square.second;
-        Pos start_pos = positions.first, end_pos = positions.second;
-        if (start_pos[0] == end_pos[0] && start_pos[1] == end_pos[1]) {
+    const Pos& selected = (current_player_ == Player::RED) ? p1_.last_selected() : p2_.last_selected();
+    int8_t selected_piece_val = board_[selected[0] * width_ + selected[1]];
+
+    // Initialize masks
+    std::vector<bool> two_square_mask(height_ * width_, true);
+    std::vector<bool> chasing_mask(height_ * width_, true);
+
+    // Apply two-square rule restrictions
+    auto two_square_valid = two_square_detector_.validate_select(
+        current_player_, static_cast<Piece>(selected_piece_val), selected);
+    
+    if (!two_square_valid.first) {
+        const auto& [start_pos, end_pos] = two_square_valid.second;
+        
+        if (start_pos == end_pos) {
             two_square_mask[start_pos[0] * width_ + start_pos[1]] = false;
-        } else if (start_pos[0] == end_pos[0]) {
-            for (auto i = std::min(start_pos[1], end_pos[1]); i < std::max(start_pos[1], end_pos[1]) + 1; ++i) {
-                two_square_mask[start_pos[0], i] = false;
-            }
-        } else if (start_pos[1] == end_pos[1]) {
-            for (auto i = std::min(start_pos[0], end_pos[0]); i < std::max(start_pos[0], end_pos[0]) + 1; ++i) {
-                two_square_mask[i, start_pos[1]] = false;
-            }
         } else {
-            throw std::runtime_error("Two square detector invalid output");
+            if (start_pos[0] == end_pos[0]) {  // Horizontal line
+                int min_col = std::min(start_pos[1], end_pos[1]);
+                int max_col = std::max(start_pos[1], end_pos[1]);
+                for (int j = min_col; j <= max_col; ++j) {
+                    two_square_mask[start_pos[0] * width_ + j] = false;
+                }
+            } else {  // Vertical line
+                int min_row = std::min(start_pos[0], end_pos[0]);
+                int max_row = std::max(start_pos[0], end_pos[0]);
+                for (int i = min_row; i <= max_row; ++i) {
+                    two_square_mask[i * width_ + start_pos[1]] = false;
+                }
+            }
         }
     }
 
-    std::vector<bool> chasing_mask;
-    auto selected_ = selected;
+    // Apply chasing rule restrictions
+    Pos rotated_selected = selected;
     if (current_player_ == Player::BLUE) {
-        selected_ = {static_cast<int8_t>(height_ - selected[0] - 1), static_cast<int8_t>(width_ - selected[1] - 1)};
+        rotated_selected = rotate_coord(selected);
     }
-    auto valid_chasing = chasing_detector_.validate_select(current_player_, Piece(selected_piece_val), selected_, board_);
-    if (!valid_chasing.first) {
-        chasing_mask.resize(height_ * width_, true);
-        auto positions = valid_chasing.second;
-        for (Pos pos : positions) {
+    
+    auto chasing_valid = chasing_detector_.validate_select(
+        current_player_, static_cast<Piece>(selected_piece_val), rotated_selected, board_, height_, width_);
+    
+    if (!chasing_valid.first) {
+        for (const Pos& pos : chasing_valid.second) {
+            Pos actual_pos = pos;
             if (current_player_ == Player::BLUE) {
-                pos = {static_cast<int8_t>(height_ - pos[0] - 1), static_cast<int8_t>(width_ - pos[1] - 1)};
+                actual_pos = rotate_coord(pos);
             }
-            chasing_mask[pos[0] * width_ + pos[1]] = false;
+            chasing_mask[actual_pos[0] * width_ + actual_pos[1]] = false;
+        }
+    }
+
+    // Generate possible destinations based on piece type
+    const std::array<std::pair<int, int>, 4> directions = {{
+        {0, 1}, {0, -1}, {1, 0}, {-1, 0}  // right, left, down, up
+    }};
+
+    if (selected_piece_val == static_cast<int8_t>(Piece::SCOUT)) {
+        // Scout can move multiple squares in one direction
+        for (const auto& dir : directions) {
+            Pos current_pos = selected;
+            int encountered_enemies = 0;
+            
+            while (true) {
+                current_pos = {static_cast<int8_t>(current_pos[0] + dir.first), static_cast<int8_t>(current_pos[1] + dir.second)};
+                
+                // Check boundaries
+                if (current_pos[0] < 0 || current_pos[0] >= height_ ||
+                    current_pos[1] < 0 || current_pos[1] >= width_) {
+                    break;
+                }
+
+                // Check lake or piece
+                int8_t target_val = board_[current_pos[0] * width_ + current_pos[1]];
+                
+                if (target_val == static_cast<int8_t>(Piece::LAKE)) {
+                    break;
+                }
+                
+                if (target_val < 0) {  // Enemy piece
+                    if (target_val == -static_cast<int8_t>(Piece::LAKE) || 
+                        ++encountered_enemies > 1) {
+                        break;
+                    }
+                }
+                
+                // Mark as valid destination
+                action_mask[current_pos[0] * width_ + current_pos[1]] = true;
+                
+                // Non-scout pieces would stop after first move
+                if (selected_piece_val != static_cast<int8_t>(Piece::SCOUT)) {
+                    break;
+                }
+            }
+        }
+    } else {
+        // Regular pieces can only move one square
+        for (const auto& dir : directions) {
+            Pos dest = {selected[0] + dir.first, selected[1] + dir.second};
+            
+            // Check boundaries
+            if (dest[0] < 0 || dest[0] >= height_ || dest[1] < 0 || dest[1] >= width_) {
+                continue;
+            }
+
+            int8_t target_val = board_[dest[0] * width_ + dest[1]];
+            
+            // Valid if empty or enemy piece (not lake)
+            if (target_val <= static_cast<int8_t>(Piece::EMPTY) && 
+                target_val != -static_cast<int8_t>(Piece::LAKE)) {
+                action_mask[dest[0] * width_ + dest[1]] = true;
+            }
+        }
+    }
+
+    // Apply restrictions from special rules
+    for (size_t i = 0; i < height_; ++i) {
+        for (size_t j = 0; j < width_; ++j) {
+            size_t idx = i * width_ + j;
+            if (!two_square_mask[idx] || !chasing_mask[idx]) {
+                action_mask[idx] = false;
+            }
         }
     }
 }
@@ -633,9 +851,24 @@ Pos StrategoEnv::get_random_action() const {
     return {static_cast<int8_t>(idx / width_), static_cast<int8_t>(idx % width_)};
 }
 
-void StrategoEnv::rotate_board(Matrix<int8_t>& board) {
-    std::reverse(board.data_.begin(), board.data_.end());
-    for (auto& elem : board.data_) {
-        elem *= -1;
+template <typename T>
+std::vector<T> StrategoEnv::rotate_tile(const std::vector<T>& tile, bool neg) const {
+    std::vector<T> result;
+    result.insert(result.end(), tile.begin(), tile.end());
+    rotate_tile_inplace<T>(result, neg);
+    return result;
+}
+
+template <typename T>
+void StrategoEnv::rotate_tile_inplace(std::vector<T>& tile, bool neg) const {
+    std::reverse(tile.begin(), tile.end());
+    if (neg) {
+        for (auto& elem : tile) {
+            elem *= -1;
+        }
     }
+}
+
+inline Pos StrategoEnv::rotate_coord(const Pos& pos) const {
+    return {static_cast<int8_t>(height_ - pos[0] - 1), static_cast<int8_t>(width_ - pos[1] - 1)};
 }

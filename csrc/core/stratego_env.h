@@ -23,8 +23,8 @@ private:
     // Game state
     GamePhase game_phase_;
     Player current_player_;
-    Matrix<int8_t> board_;
-    Matrix<bool> lakes_;
+    mutable std::vector<int8_t> board_;
+    std::vector<bool> lakes_;
 
     // Players
     PlayerStateHandler p1_;
@@ -54,7 +54,7 @@ public:
     std::tuple<std::vector<double>, std::vector<bool>, int, bool, bool> step(const Pos& action);
 
     // Getters
-    const Matrix<int8_t>& board() const { return board_; }
+    const std::vector<int8_t>& board() const { return board_; }
     GamePhase game_phase() const { return game_phase_; }
     Player current_player() const { return current_player_; }
     const PlayerStateHandler& player_state(Player player) const;
@@ -66,7 +66,7 @@ private:
 
     // Observation helpers
     void get_public_obs(
-        const std::array<Matrix<bool>, 3>& public_obs_info,
+        const std::array<std::vector<bool>, 3>& public_obs_info,
         const std::vector<int>& unrevealed,
         const std::vector<int>& pieces,
         const std::vector<int>& movable_pieces,
@@ -85,7 +85,14 @@ private:
 
     // Helper methods
     Pos get_random_action() const;
-    void rotate_board(Matrix<int8_t>& board);
+    
+    template <typename T>
+    std::vector<T> rotate_tile(const std::vector<T>& tile, bool neg = true) const;
+
+    template <typename T>
+    void rotate_tile_inplace(std::vector<T>& tile, bool neg = true) const;
+    
+    inline Pos rotate_coord(const Pos& pos) const;
 };
 
 #endif // STRATEGO_ENV_H

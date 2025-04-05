@@ -4,18 +4,12 @@
 PlayerStateHandler::PlayerStateHandler(Player player, size_t height, size_t width) 
     : player_(player), 
       deploy_idx_(0),
-      deploy_mask_(height, width, false),
-      public_obs_info_{
-          Matrix<bool>(height, width, false),
-          Matrix<bool>(height, width, false),
-          Matrix<bool>(height, width, false)
-      },
       last_selected_({-1, -1}), 
       last_selected_piece_(Piece::EMPTY) {}
 
 void PlayerStateHandler::generate_state(
     const std::vector<int>& pieces_num,
-    const Matrix<bool>& deploy_mask,
+    const std::vector<bool>& deploy_mask,
     size_t observed_history_entries,
     size_t height,
     size_t width) {
@@ -26,9 +20,9 @@ void PlayerStateHandler::generate_state(
     deploy_idx_ = 0;
     deploy_mask_ = deploy_mask;
     public_obs_info_ = {
-        Matrix<bool>(height, width, false),
-        Matrix<bool>(height, width, false),
-        Matrix<bool>(height, width, false)
+        std::vector<bool>(height * width, false),
+        std::vector<bool>(height * width, false),
+        std::vector<bool>(height * width, false)
     };
     observed_moves_.clear();
     last_selected_ = {-1, -1};

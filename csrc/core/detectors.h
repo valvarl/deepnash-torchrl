@@ -26,24 +26,24 @@ private:
 
     bool is_adjacent(const Pos& pos1, const Pos& pos2) const;
     bool is_on_same_line(const Pos& pos1, const Pos& pos2, 
-                        const Matrix<int8_t>& board) const;
+                        const std::vector<int8_t>& board, size_t height, size_t width) const;
 
 public:
     ChasingDetector() = default;
 
     bool check_chasing_condition(Piece verified_piece, const Pos& verified_pos,
                                const Pos& opponent_pos, 
-                               const Matrix<int8_t>& board) const;
+                               const std::vector<int8_t>& board, size_t height, size_t width) const;
 
     std::pair<bool, std::vector<Pos>> validate_select(Player player, Piece piece,
                                                      const Pos& pos,
-                                                     const Matrix<int8_t>& board) const;
+                                                     const std::vector<int8_t>& board, size_t height, size_t width) const;
 
     bool validate_move(Player player, Piece piece, const Pos& from_pos,
-                      const Pos& to_pos, const Matrix<int8_t>& board) const;
+                      const Pos& to_pos, const std::vector<int8_t>& board, size_t height, size_t width) const;
 
     void update(Player player, Piece piece, const Pos& from_pos,
-               const Pos& to_pos, const Matrix<int8_t>& board);
+               const Pos& to_pos, const std::vector<int8_t>& board, size_t height, size_t width);
 
     void reset() { chase_moves_.clear(); }
 };
