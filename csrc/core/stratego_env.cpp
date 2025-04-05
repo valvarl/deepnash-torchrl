@@ -4,6 +4,25 @@
 #include <algorithm>
 #include <numeric>
 
+void roll(std::vector<double>& vec, int shift) {
+    if (vec.empty()) return;
+    
+    shift %= static_cast<int>(vec.size());
+    if (shift < 0) {
+        shift += vec.size(); // обработка отрицательного сдвига
+    }
+    
+    std::rotate(vec.begin(), vec.begin() + (vec.size() - shift), vec.end());
+}
+
+void rotate_plane(std::vector<double>& vec) {
+    if (vec.empty()) return;
+    std::reverse(vec.begin(), vec.end());
+    for (auto& elem : vec) {
+        elem *= -1;
+    }
+}
+
 StrategoEnv::StrategoEnv(std::shared_ptr<StrategoConfig> config, uint32_t seed)
     : config_(std::move(config)),
       game_phase_(GamePhase::TERMINAL),
@@ -310,9 +329,10 @@ std::tuple<std::vector<double>, std::vector<bool>, int, bool, bool> StrategoEnv:
 
             curr_player.last_selected_ = action;
 
-            auto selected_piece = board_(src[0], src[1]);
-            auto destination = board_(dest[0], dest[1]);
-
+            int8_t src_piece_val = board_(src[0], src[1]);
+            int8_t dest_piece_val = board_(dest[0], dest[1]);
+            
+            // Check if draw conditions are met
             if (total_moves_ >= total_moves_limit_ || 
                 moves_since_attack_ >= moves_since_attack_limit_) {
                 terminated = true;
@@ -322,35 +342,105 @@ std::tuple<std::vector<double>, std::vector<bool>, int, bool, bool> StrategoEnv:
                 break;
             }
 
-
-            
-            // Обновление истории движений
-            // update_observation_history(src, dest);
-            
-            // Логика захвата и движения
-            Piece attacker = static_cast<Piece>(board_(src[0], src[1]));
-            Piece defender = static_cast<Piece>(board_(dest[0], dest[1]));
-            // handle_capture(attacker, defender, src, dest);
-            
-            // Проверка условий победы
-            if (defender == Piece::FLAG) {
-                reward = 1;
-                terminated = true;
-            }
-            
-            // Обновление счётчиков
+            // Update Draw conditions
             total_moves_++;
-            moves_since_attack_ = (defender == Piece::EMPTY) ? moves_since_attack_ + 1 : 0;
+            moves_since_attack_ = (dest_piece_val == static_cast<int8_t>(Piece::EMPTY)) ? moves_since_attack_ + 1 : 0;
             
-            // Проверка условий ничьи
-            if (total_moves_ >= total_moves_limit_ || 
-                moves_since_attack_ >= moves_since_attack_limit_) {
-                terminated = true;
-                truncated = true;
+            // Update Move Histories
+            roll(curr_player.observed_moves_, height_ * width_);
+            roll(opp_player.observed_moves_, height_ * width_);
+            std::vector<double> move;
+            encode_move(src, dest, move);
+            std::copy(move.begin(), move.end(), curr_player.observed_moves_.begin());
+            rotate_plane(move);
+            std::copy(move.begin(), move.end(), opp_player.observed_moves_.begin());
+
+            two_square_detector_.update(current_player_, static_cast<Piece>(src_piece_val), src, dest);
+            Pos src_rot = {static_cast<int8_t>(height_ - src[0] - 1), static_cast<int8_t>(width_ - src[1] - 1)};
+            Pos dest_rot = {static_cast<int8_t>(height_ - dest[0] - 1), static_cast<int8_t>(width_ - dest[1] - 1)};
+            
+            auto _src = src, _dest = dest;
+            if (current_player_ == Player::BLUE) {
+                _src = src_rot;
+                _dest = dest_rot;
+            }
+            chasing_detector_.update(current_player_, static_cast<Piece>(src_piece_val), _src, _dest, board_);
+
+            if (src_piece_val = -dest_piece_val) { // Equal Strength
+                // remove both pieces
+                board_(src[0], src[1]) = 0;
+                board_(dest[0], dest[1]) = 0;
+                for (int k = 0; k < 3; ++k) {
+                    curr_player.public_obs_info_[k](src[0], src[1]) = 0;
+                    curr_player.public_obs_info_[k](dest[0], dest[1]) = 0;
+                    opp_player.public_obs_info_[k](src_rot[0], src_rot[1]) = 0;
+                    opp_player.public_obs_info_[k](dest_rot[0], dest_rot[1]) = 0;
+                }
+                curr_player.unrevealed_[src_piece_val]--;
+                opp_player.unrevealed_[dest_piece_val]--;
+            } else if ((src_piece_val == static_cast<int8_t>(Piece::SPY) && dest_piece_val == -static_cast<int8_t>(Piece::MARSHAL)) ||  // Spy vs Marshal
+                       (src_piece_val > -dest_piece_val && (src_piece_val == static_cast<int8_t>(Piece::MINER) && dest_piece_val == -static_cast<int8_t>(Piece::BOMB) || 
+                        dest_piece_val != -static_cast<int8_t>(Piece::BOMB))) ||  // attacker is stronger (+Bomb case)
+                       (dest_piece_val == -static_cast<int8_t>(Piece::FLAG))) {  // enemy Flag found
+                // remove enemy piece
+                board_(src[0], src[1]) = 0;
+                board_(dest[0], dest[1]) = src_piece_val;
+                for (int k = 0; k < 3; ++k) {
+                    curr_player.public_obs_info_[k](src[0], src[1]) = 0;
+                }
+                if (dest_piece_val != static_cast<int8_t>(Piece::EMPTY)) {
+                    curr_player.public_obs_info_[2](dest[0], dest[1]) = src_piece_val;
+                    for (int k = 0; k < 3; ++k) {
+                        opp_player.public_obs_info_[k](dest_rot[0], dest_rot[1]) = 0;
+                    }
+                    curr_player.unrevealed_[src_piece_val]--;
+                    opp_player.unrevealed_[dest_piece_val]--;
+                } else {
+                    bool scout_move = (src[0] == dest[0] && abs(src[1] - dest[1]) > 1) || (src[1] == dest[1] && abs(src[0] - dest[0]) > 1);
+                    if (scout_move) {
+                        curr_player.public_obs_info_[2](dest[0], dest[1]) = src_piece_val;
+                        curr_player.unrevealed_[src_piece_val]--;
+                    } else {
+                        curr_player.public_obs_info_[1](dest[0], dest[1]) = 1;
+                    }
+                }
+                if (dest_piece_val == -static_cast<int8_t>(Piece::FLAG)) {
+                    reward = 1;
+                    terminated = true;
+                }
+            } else if (src_piece_val < -dest_piece_val || dest_piece_val == -static_cast<int8_t>(Piece::BOMB)) {
+                // remove attacker
+                board_(src[0], src[1]) = 0;
+                for (int k = 0; k < 3; ++k) {
+                    curr_player.public_obs_info_[k](src[0], src[1]) = 0;
+                }
+                for (int k = 0; k < 2; ++k) {
+                    opp_player.public_obs_info_[k](dest_rot[0], dest_rot[1]) = 0;
+                }
+                opp_player.public_obs_info_[2](dest_rot[0], dest_rot[1]) = dest_piece_val;
+                curr_player.unrevealed_[src_piece_val]--;
+                opp_player.unrevealed_[dest_piece_val]--;
             }
             
-            // Смена игрока и фазы
+            rotate_board(board_);
             current_player_ = (current_player_ == Player::RED) ? Player::BLUE : Player::RED;
+
+            // Check if any pieces can be moved. If one player has no movable pieces, the other player wins.
+            // If both players have no movable pieces, the game is a draw.
+            if (!terminated) {
+                std::vector<bool> action_mask;
+                valid_pieces_to_select(action_mask, false);
+                bool curr_no_moves = std::any_of(action_mask.begin(), action_mask.end(), [](bool x) { return x; });
+                if (curr_no_moves) {
+                    action_mask.clear();
+                    valid_pieces_to_select(action_mask, true);
+                    bool draw_game = std::any_of(action_mask.begin(), action_mask.end(), [](bool x) { return x; });
+                    game_phase_ = GamePhase::TERMINAL;
+                    reward = draw_game ? 0 : 1;
+                    terminated = true;
+                    break;
+                }
+            }
             game_phase_ = terminated ? GamePhase::TERMINAL : GamePhase::SELECT;
             break;
         }
@@ -361,120 +451,6 @@ std::tuple<std::vector<double>, std::vector<bool>, int, bool, bool> StrategoEnv:
     
     generate_env_state(obs, action_mask);
     return {std::move(obs), std::move(action_mask), reward, terminated, truncated};
-}
-
-std::tuple<std::vector<double>, int, bool, bool> StrategoEnv::movement_step(const Pos& dest) {
-    // 1. Определить источник (source)
-    Pos source = current_player_ == Player::RED ? p1_.last_selected() : p2_.last_selected();
-
-    // 2. Проверить корректность хода
-    if (!check_action_valid(source, dest)) {
-        Pos sampled = action_space_.sample();
-        return movement_step(sampled);  // Рекурсивный вызов с новым действием
-    }
-
-    // 3. Обновить last_selected
-    if (current_player_ == Player::RED)
-        p1_.set_last_selected(dest);
-    else
-        p2_.set_last_selected(dest);
-
-    // 4. Получить фигуры
-    int8_t selected_piece = board_(source[0], source[1]);
-    int8_t destination = board_(dest[0], dest[1]);
-
-    // 5. Создать action mask (2 канала)
-    std::array<Matrix<bool>, 2> action_mask = {
-        Matrix<bool>(height_, width_, false),
-        Matrix<bool>(height_, width_, false)
-    };
-    action_mask[0](source[0], source[1]) = true;
-    action_mask[1](dest[0], dest[1]) = true;
-
-    // 6. Проверка на ничью
-    if (total_moves_ >= total_moves_limit_ || moves_since_attack_ >= moves_since_attack_limit_) {
-        rotate_board();
-        game_phase_ = GamePhase::TERMINAL;
-        return {generate_observation(), 0, true, false};
-    }
-
-    // 7. Обновление счётчиков
-    total_moves_++;
-    moves_since_attack_ = (destination == static_cast<int8_t>(Piece::EMPTY)) 
-                          ? moves_since_attack_ + 1 : 0;
-
-    // 8. Обновить историю ходов
-    update_observation_history(source, dest);
-
-    // 9. Обновить детекторы
-    update_detectors(current_player_, selected_piece, source, dest);
-
-    // 10. Боевая логика
-    int reward = 0;
-    bool terminated = false;
-
-    if (selected_piece == -destination) {
-        handle_capture_both(source, dest, selected_piece);
-    } else if (
-        (selected_piece == static_cast<int8_t>(Piece::SPY) && destination == -static_cast<int8_t>(Piece::MARSHAL)) ||
-        (selected_piece > -destination && 
-         (selected_piece == static_cast<int8_t>(Piece::MINER) && destination == -static_cast<int8_t>(Piece::BOMB)) ||
-         destination != -static_cast<int8_t>(Piece::BOMB)) ||
-        (destination == -static_cast<int8_t>(Piece::FLAG))
-    ) {
-        handle_capture_enemy(source, dest, selected_piece);
-        if (destination == -static_cast<int8_t>(Piece::FLAG)) {
-            reward = 1;
-            terminated = true;
-        }
-    } else if (selected_piece < -destination || destination == -static_cast<int8_t>(Piece::BOMB)) {
-        handle_capture_self(source, dest, selected_piece, destination);
-    }
-
-    // 11. Повернуть доску
-    rotate_board();
-
-    // 12. Проверка на конец игры из-за отсутствия ходов
-    if (!terminated) {
-        bool no_moves = !has_available_moves(current_player_);
-        if (no_moves) {
-            bool other_no_moves = !has_available_moves(get_opponent(current_player_));
-            game_phase_ = GamePhase::TERMINAL;
-            reward = other_no_moves ? 0 : 1;
-            return {generate_observation(), reward, true, false};
-        }
-    }
-
-    game_phase_ = terminated ? GamePhase::TERMINAL : GamePhase::SELECT;
-    return {generate_observation(), reward, terminated, false};
-}
-
-
-Matrix<bool> StrategoEnv::valid_spots_to_place() const {
-    Matrix<bool> mask(height_ * width_, false);
-    const auto& deploy_mask = (current_player_ == Player::RED) ? 
-        p1_.deploy_mask() : p2_.deploy_mask();
-    
-    for (size_t y = 0; y < height_; ++y) {
-        for (size_t x = 0; x < width_; ++x) {
-            if (board_(y, x) == static_cast<int8_t>(Piece::EMPTY) && deploy_mask(y, x)) {
-                mask(y, x) = true;
-            }
-        }
-    }
-    return mask;
-}
-
-Matrix<bool> StrategoEnv::valid_pieces_to_select(bool is_other_player) const {
-    // Аналогично Python-версии, но возвращает плоский вектор
-    // ...
-    return {}; // Заглушка
-}
-
-Matrix<bool> StrategoEnv::valid_destinations() const {
-    // Аналогично Python-версии, но возвращает плоский вектор
-    // ...
-    return {}; // Заглушка
 }
 
 inline std::pair<bool, std::string> StrategoEnv::validate_coord(const Pos& coord) const {
@@ -509,52 +485,63 @@ bool StrategoEnv::check_action_valid(const Pos& src, const Pos& dest) const {
     return true;
 }
 
+void StrategoEnv::valid_spots_to_place(std::vector<bool>& action_mask) const {
+    // const auto& deploy_mask = (current_player_ == Player::RED) ? 
+    //     p1_.deploy_mask() : p2_.deploy_mask();
+    
+    // for (size_t y = 0; y < height_; ++y) {
+    //     for (size_t x = 0; x < width_; ++x) {
+    //         if (board_(y, x) == static_cast<int8_t>(Piece::EMPTY) && deploy_mask(y, x)) {
+    //             action_mask(y, x) = true;
+    //         }
+    //     }
+    // }
+}
+
+void StrategoEnv::valid_pieces_to_select(std::vector<bool>& action_mask, bool is_other_player = false) const {
+
+}
+
+void StrategoEnv::valid_destinations(std::vector<bool>& action_mask) const {
+
+}
+
 Pos StrategoEnv::get_random_action() const {
     std::random_device rd;
     std::mt19937 gen(rd());
-    
+
+    std::vector<bool> action_mask; 
+
     switch (game_phase_) {
         case GamePhase::DEPLOY: {
-            auto valid = valid_spots_to_place();
-            std::vector<int> indices;
-            for (size_t i = 0; i < valid.size(); ++i) {
-                if (valid[i]) indices.push_back(i);
-            }
-            if (indices.empty()) return {-1, -1};
-            std::uniform_int_distribution<> dist(0, indices.size() - 1);
-            int idx = indices[dist(gen)];
-            return {idx / config_->width(), idx % config_->width()};
+            valid_spots_to_place(action_mask);
+            break;
         }
-        
         case GamePhase::SELECT: {
-            auto valid = valid_pieces_to_select();
-            std::vector<int> indices;
-            for (size_t i = 0; i < valid.size(); ++i) {
-                if (valid[i]) indices.push_back(i);
-            }
-            if (indices.empty()) return {-1, -1};
-            std::uniform_int_distribution<> dist(0, indices.size() - 1);
-            int idx = indices[dist(gen)];
-            return {idx / config_->width(), idx % config_->width()};
+            valid_pieces_to_select(action_mask);
+            break;
         }
-        
         case GamePhase::MOVE: {
-            auto valid = valid_destinations();
-            std::vector<int> indices;
-            for (size_t i = 0; i < valid.size(); ++i) {
-                if (valid[i]) indices.push_back(i);
-            }
-            if (indices.empty()) return {-1, -1};
-            std::uniform_int_distribution<> dist(0, indices.size() - 1);
-            int idx = indices[dist(gen)];
-            return {idx / config_->width(), idx % config_->width()};
+            valid_destinations(action_mask);
+            break;
         }
-        
         default:
             return {-1, -1};
     }
+
+    std::vector<size_t> indices;
+    for (size_t i = 0; i < action_mask.size(); ++i) {
+        if (action_mask[i]) indices.push_back(i);
+    }
+    if (indices.empty()) return {-1, -1};
+    std::uniform_int_distribution<> dist(0, indices.size() - 1);
+    size_t idx = indices[dist(gen)];
+    return {static_cast<int8_t>(idx / width_), static_cast<int8_t>(idx % width_)};
 }
 
 void StrategoEnv::rotate_board(Matrix<int8_t>& board) {
     std::reverse(board.data_.begin(), board.data_.end());
+    for (auto& elem : board.data_) {
+        elem *= -1;
+    }
 }
