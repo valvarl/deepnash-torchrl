@@ -76,7 +76,7 @@ private:
 
     // Movement and validation
     // std::tuple<std::vector<double>, int, bool, bool> movement_step(const Pos& action);
-    bool check_action_valid(const Pos& src, const Pos& dest) const;
+    std::pair<bool, std::string> check_action_valid(const Pos& src, const Pos& dest) const;
     std::pair<bool, std::string> validate_coord(const Pos& coord) const;
 
     void valid_spots_to_place(std::vector<bool>& action_mask) const;

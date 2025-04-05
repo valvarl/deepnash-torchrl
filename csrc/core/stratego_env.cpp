@@ -318,10 +318,11 @@ std::tuple<std::vector<double>, std::vector<bool>, int, bool, bool> StrategoEnv:
             auto src = (current_player_ == Player::RED) ? p1_.last_selected() : p2_.last_selected();
             auto dest = action;
             
-            if (!check_action_valid(src, dest)) {
+            auto valid = check_action_valid(src, dest);
+            if (!valid.first) {
                 // action = action_space_.sample();
                 // dest = action;
-                throw std::invalid_argument("Invalid move");
+                throw std::invalid_argument(valid.second);
             }
 
             auto& curr_player = (current_player_ == Player::RED) ? p1_ : p2_;
@@ -462,48 +463,141 @@ inline std::pair<bool, std::string> StrategoEnv::validate_coord(const Pos& coord
     return {true, ""};
 }
 
-bool StrategoEnv::check_action_valid(const Pos& src, const Pos& dest) const {
-    // Проверка координат
-    if (src[0] < 0 || src[0] >= static_cast<int>(config_->height()) ||
-        src[1] < 0 || src[1] >= static_cast<int>(config_->width()) ||
-        dest[0] < 0 || dest[0] >= static_cast<int>(config_->height()) ||
-        dest[1] < 0 || dest[1] >= static_cast<int>(config_->width())) {
-        return false;
+std::pair<bool, std::string> StrategoEnv::check_action_valid(const Pos& src, const Pos& dest) const {
+    auto valid = validate_coord(src);
+    if (!valid.first) {
+        return valid;
+    }
+
+    valid = validate_coord(dest);
+    if (!valid.first) {
+        return valid;
     }
     
-    Piece selected_piece = static_cast<Piece>(board_(src[0], src[1]));
-    Piece destination = static_cast<Piece>(board_(dest[0], dest[1]));
+    int8_t src_piece_val = board_(src[0], src[1]);
+    int8_t dest_piece_val = board_(dest[0], dest[1]);
+
+    if (src_piece_val < static_cast<int8_t>(Piece::SPY)) {
+        return {false, "Selected piece cannot be moved by player"};
+    }
+
+    if (abs(dest_piece_val) == static_cast<int8_t>(Piece::SPY)) {
+        return {false, "Destination is an obstacle"};
+    }
     
-    // Основные проверки допустимости хода
-    if (selected_piece < Piece::SPY) return false;
-    if (destination == Piece::LAKE) return false;
-    if (destination > Piece::LAKE) return false;
+    if (dest_piece_val > static_cast<int8_t>(Piece::SPY)) {
+        return {false, "Destination is already occupied by player's piece"};
+    }
     
-    // Проверка движения для разных типов фигур
-    // ...
+    if (src_piece_val != static_cast<int8_t>(Piece::SCOUT)) {
+        if (!(src[0] == dest[0] && abs(src[1] - dest[1]) == 1) && !(src[1] == dest[1] && abs(src[0] - dest[0]) == 1)) {
+            return {false, "Invalid move"};
+        }
+    } else {
+        if (src[0] != dest[0] || src[1] != dest[1]) {
+            return {false, "Scouts can only move in straight lines"};
+        }
+        if (src[0] == dest[0]) {
+            for (auto i = std::min(src[1], dest[1]) + 1; i < std::max(src[1], dest[1]); ++i) {
+                if (board_(src[0], i) != 0) {
+                    return {false, "Pieces in the path of scout"};
+                }
+            }
+        } else if (src[1] == dest[1]) {
+            for (auto i = std::min(src[0], dest[0]) + 1; i < std::max(src[0], dest[0]); ++i) {
+                if (board_(i, src[1]) != 0) {
+                    return {false, "Pieces in the path of scout"};
+                }
+            }
+        } else {
+            return {false, "Invalid move"};
+        }
+    }
+
+    if (!two_square_detector_.validate_move(current_player_, Piece(src_piece_val), src, dest)) {
+        return {false, "Two-square rule violation"};
+    }
+
+    auto src_ = src, dest_ = dest;
+    if (current_player_ == Player::BLUE) {
+        src_ = {static_cast<int8_t>(height_ - src[0] - 1), static_cast<int8_t>(width_ - src[1] - 1)};
+        dest_ = {static_cast<int8_t>(height_ - dest[0] - 1), static_cast<int8_t>(width_ - dest[1] - 1)};
+    }
+    if (!chasing_detector_.validate_move(current_player_, Piece(src_piece_val), src_, dest_, board_)) {
+        return {false, "More-square rule violation"};
+    }
     
-    return true;
+    return {true, "Valid Action"};
 }
 
 void StrategoEnv::valid_spots_to_place(std::vector<bool>& action_mask) const {
-    // const auto& deploy_mask = (current_player_ == Player::RED) ? 
-    //     p1_.deploy_mask() : p2_.deploy_mask();
+    const auto& deploy_mask = (current_player_ == Player::RED) ? 
+        p1_.deploy_mask() : p2_.deploy_mask();
     
-    // for (size_t y = 0; y < height_; ++y) {
-    //     for (size_t x = 0; x < width_; ++x) {
-    //         if (board_(y, x) == static_cast<int8_t>(Piece::EMPTY) && deploy_mask(y, x)) {
-    //             action_mask(y, x) = true;
-    //         }
-    //     }
-    // }
+    for (size_t y = 0; y < height_; ++y) {
+        for (size_t x = 0; x < width_; ++x) {
+            if (board_(y, x) == static_cast<int8_t>(Piece::EMPTY) && deploy_mask(y, x)) {
+                action_mask[y * width_ + x] = true;
+            }
+        }
+    }
 }
 
 void StrategoEnv::valid_pieces_to_select(std::vector<bool>& action_mask, bool is_other_player = false) const {
+    auto board = board_;
+    if (is_other_player) {
+        rotate_board(board);
+    }
 
 }
 
 void StrategoEnv::valid_destinations(std::vector<bool>& action_mask) const {
+    action_mask.clear();
+    action_mask.resize(height_ * width_, false);
 
+    if (game_phase_ != GamePhase::MOVE) {
+        return;
+    }
+    auto& selected = current_player_ == Player::RED ? p1_.last_selected_ : p2_.last_selected_;
+    auto selected_piece_val = board_(selected[0], selected[1]);
+
+    std::vector<bool> two_square_mask;
+    auto valid_two_square = two_square_detector_.validate_select(current_player_, Piece(selected_piece_val), selected);
+    if (!valid_two_square.first) {
+        two_square_mask.resize(height_ * width_, true);
+        auto positions = valid_two_square.second;
+        Pos start_pos = positions.first, end_pos = positions.second;
+        if (start_pos[0] == end_pos[0] && start_pos[1] == end_pos[1]) {
+            two_square_mask[start_pos[0] * width_ + start_pos[1]] = false;
+        } else if (start_pos[0] == end_pos[0]) {
+            for (auto i = std::min(start_pos[1], end_pos[1]); i < std::max(start_pos[1], end_pos[1]) + 1; ++i) {
+                two_square_mask[start_pos[0], i] = false;
+            }
+        } else if (start_pos[1] == end_pos[1]) {
+            for (auto i = std::min(start_pos[0], end_pos[0]); i < std::max(start_pos[0], end_pos[0]) + 1; ++i) {
+                two_square_mask[i, start_pos[1]] = false;
+            }
+        } else {
+            throw std::runtime_error("Two square detector invalid output");
+        }
+    }
+
+    std::vector<bool> chasing_mask;
+    auto selected_ = selected;
+    if (current_player_ == Player::BLUE) {
+        selected_ = {static_cast<int8_t>(height_ - selected[0] - 1), static_cast<int8_t>(width_ - selected[1] - 1)};
+    }
+    auto valid_chasing = chasing_detector_.validate_select(current_player_, Piece(selected_piece_val), selected_, board_);
+    if (!valid_chasing.first) {
+        chasing_mask.resize(height_ * width_, true);
+        auto positions = valid_chasing.second;
+        for (Pos pos : positions) {
+            if (current_player_ == Player::BLUE) {
+                pos = {static_cast<int8_t>(height_ - pos[0] - 1), static_cast<int8_t>(width_ - pos[1] - 1)};
+            }
+            chasing_mask[pos[0] * width_ + pos[1]] = false;
+        }
+    }
 }
 
 Pos StrategoEnv::get_random_action() const {
