@@ -672,7 +672,7 @@ void StrategoEnv::valid_pieces_to_select(std::vector<bool>& action_mask, bool is
             }};
 
             for (const auto& dir : directions) {
-                Pos check_pos = {last_pos[0] + dir.first, last_pos[1] + dir.second};
+                Pos check_pos = {static_cast<int8_t>(last_pos[0] + dir.first), static_cast<int8_t>(last_pos[1] + dir.second)};
                 
                 while (check_pos[0] >= 0 && check_pos[0] < height_ && 
                        check_pos[1] >= 0 && check_pos[1] < width_) {
@@ -827,7 +827,7 @@ void StrategoEnv::valid_destinations(std::vector<bool>& action_mask) const {
     } else {
         // Regular pieces can only move one square
         for (const auto& dir : directions) {
-            Pos dest = {selected[0] + dir.first, selected[1] + dir.second};
+            Pos dest = {static_cast<int8_t>(selected[0] + dir.first), static_cast<int8_t>(selected[1] + dir.second)};
             
             // Check boundaries
             if (dest[0] < 0 || dest[0] >= height_ || dest[1] < 0 || dest[1] >= width_) {
@@ -892,37 +892,11 @@ inline const PlayerStateHandler& StrategoEnv::player_state(Player player, bool o
     return current_player_ == Player::RED ^ opponent ? p1_ : p2_;
 }
 
-template <typename T>
-std::vector<T> StrategoEnv::rotate_tile(const std::vector<T>& tile, bool neg) const {
-    std::vector<T> result;
-    result.insert(result.end(), tile.begin(), tile.end());
-    rotate_tile_inplace<T>(result, neg);
-    return result;
-}
-
-template <typename T>
-void StrategoEnv::rotate_tile_inplace(std::vector<T>& tile, bool neg) const {
-    std::reverse(tile.begin(), tile.end());
-    if (neg) {
-        for (auto& elem : tile) {
-            elem *= -1;
-        }
-    }
-}
-
-template<>
-void StrategoEnv::rotate_tile_inplace<bool>(std::vector<bool>& tile, bool neg) const {
-    std::reverse(tile.begin(), tile.end());
-    if (neg) {
-        for (size_t i = 0; i < tile.size(); ++i) {
-            tile[i] = !tile[i];
-        }
-    }
-}
-
 inline Pos StrategoEnv::rotate_coord(const Pos& pos) const {
     return {static_cast<int8_t>(height_ - pos[0] - 1), static_cast<int8_t>(width_ - pos[1] - 1)};
 }
+
+const Pos& StrategoEnv::last_selected(Player player) const { return player_state(player).last_selected(); }
 
 inline void StrategoEnv::switch_current_player() {
     current_player_ = (current_player_ == Player::RED) ? Player::BLUE : Player::RED;

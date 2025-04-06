@@ -6,6 +6,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)  # Добавляем эту строку
 set(CMAKE_C_COMPILER "gcc-13")
 set(CMAKE_CXX_COMPILER "g++-13")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -flto=auto")
 
 find_package(pybind11 REQUIRED)
 

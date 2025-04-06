@@ -55,14 +55,23 @@ public:
 
     Pos get_random_action() const;
 
-    // Getters
-    const std::vector<int8_t>& board() const { return board_; }
-    const std::vector<bool>& lakes() const { return lakes_; }
-    GamePhase game_phase() const { return game_phase_; }
-    Player current_player() const { return current_player_; }
+    // Helper methods
+    template <typename T>
+    std::vector<T> rotate_tile(const std::vector<T>& tile, bool neg = true) const;
 
+    inline Pos rotate_coord(const Pos& pos) const;
+
+    // Getters
     const size_t height() const { return height_; }
     const size_t width() const { return width_; }
+    GamePhase game_phase() const { return game_phase_; }
+    Player current_player() const { return current_player_; }
+    const std::vector<int8_t>& board() const { return board_; }
+    const std::vector<bool>& lakes() const { return lakes_; }
+    const std::vector<int>& allowed_pieces() const { return allowed_pieces_; }
+    const int total_moves() const { return total_moves_; }
+    const int moves_since_attack() const { return moves_since_attack_; }
+    const Pos& last_selected(Player player) const;
 
 private:
     // Observation and state generation
@@ -80,7 +89,6 @@ private:
     void encode_move(const Pos& src, const Pos& dest, std::vector<double>& encoding) const;
 
     // Movement and validation
-    // std::tuple<std::vector<double>, int, bool, bool> movement_step(const Pos& action);
     std::pair<bool, std::string> check_action_valid(const Pos& src, const Pos& dest) const;
     std::pair<bool, std::string> validate_coord(const Pos& coord) const;
 
@@ -90,15 +98,38 @@ private:
 
     // Helper methods
     template <typename T>
-    std::vector<T> rotate_tile(const std::vector<T>& tile, bool neg = true) const;
-
-    template <typename T>
     void rotate_tile_inplace(std::vector<T>& tile, bool neg = true) const;
-    
-    inline Pos rotate_coord(const Pos& pos) const;
-    
+
     inline const PlayerStateHandler& player_state(Player player, bool opponent = false) const;
     inline void switch_current_player();
 };
+
+template <typename T>
+std::vector<T> StrategoEnv::rotate_tile(const std::vector<T>& tile, bool neg) const {
+    std::vector<T> result;
+    result.insert(result.end(), tile.begin(), tile.end());
+    rotate_tile_inplace<T>(result, neg);
+    return result;
+}
+
+template <typename T>
+void StrategoEnv::rotate_tile_inplace(std::vector<T>& tile, bool neg) const {
+    std::reverse(tile.begin(), tile.end());
+    if (neg) {
+        for (auto& elem : tile) {
+            elem *= -1;
+        }
+    }
+}
+
+template<>
+void StrategoEnv::rotate_tile_inplace<bool>(std::vector<bool>& tile, bool neg) const {
+    std::reverse(tile.begin(), tile.end());
+    if (neg) {
+        for (size_t i = 0; i < tile.size(); ++i) {
+            tile[i] = !tile[i];
+        }
+    }
+}
 
 #endif // STRATEGO_ENV_H
