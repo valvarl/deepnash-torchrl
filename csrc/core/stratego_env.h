@@ -53,11 +53,17 @@ public:
     void reset(uint32_t seed = 0);
     std::tuple<std::vector<double>, std::vector<bool>, int, bool, bool> step(const Pos& action);
 
+    Pos get_random_action() const;
+
     // Getters
     const std::vector<int8_t>& board() const { return board_; }
+    const std::vector<bool>& lakes() const { return lakes_; }
     GamePhase game_phase() const { return game_phase_; }
     Player current_player() const { return current_player_; }
     const PlayerStateHandler& player_state(Player player) const;
+
+    const size_t height() const { return height_; }
+    const size_t width() const { return width_; }
 
 private:
     // Observation and state generation
@@ -84,8 +90,6 @@ private:
     void valid_destinations(std::vector<bool>& action_mask) const;
 
     // Helper methods
-    Pos get_random_action() const;
-    
     template <typename T>
     std::vector<T> rotate_tile(const std::vector<T>& tile, bool neg = true) const;
 

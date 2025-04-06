@@ -1,6 +1,11 @@
 #include "stratego_config.h"
 #include <algorithm>
 #include <stdexcept>
+#include <format>
+
+#include <sstream>
+#include <iostream>
+#include "prettyprint.hpp"
 
 // Static member initialization
 const std::unordered_map<Piece, int> StrategoConfig::PIECES_NUM_ORIGINAL = {
@@ -89,10 +94,10 @@ std::pair<bool, std::string> StrategoConfig::validate() const {
         }
         
         if (p1_spots < p1_pieces) {
-            return {false, "Player 1 has fewer deployment spots than pieces"};
+            return {false, std::format("Player 1 has fewer deployment spots ({}) than pieces ({})", p1_spots, p1_pieces)};
         }
         if (p2_spots < p2_pieces) {
-            return {false, "Player 2 has fewer deployment spots than pieces"};
+            return {false, std::format("Player 2 has fewer deployment spots ({}) than pieces ({})", p2_spots, p2_pieces)};
         }
     } else {
         // Competitive deployment validation
@@ -158,8 +163,8 @@ StrategoConfig::StrategoConfig(
     p1_pieces_(p1_pieces),
     p2_pieces_(p2_pieces.empty() ? p1_pieces : p2_pieces),
     lakes_mask_(lakes_mask.size() == 0 ? make_mask(lakes) : lakes_mask),
-    p1_deploy_mask_(p1_deploy_mask.size() == 0 ? make_mask(p1_places_to_deploy) : p1_deploy_mask),
-    p2_deploy_mask_(p2_deploy_mask.size() == 0 ? make_mask(p2_places_to_deploy) : p2_deploy_mask),
+    p1_deploy_mask_(p1_deploy_mask.empty() ? make_mask(p1_places_to_deploy) : p1_deploy_mask),
+    p2_deploy_mask_(p2_deploy_mask.empty() ? make_mask(p2_places_to_deploy) : p2_deploy_mask),
     total_moves_limit_(total_moves_limit),
     moves_since_attack_limit_(moves_since_attack_limit),
     observed_history_entries_(observed_history_entries),
@@ -167,18 +172,8 @@ StrategoConfig::StrategoConfig(
     game_mode_(game_mode) {
     
     allowed_pieces_.clear();
-    for (size_t i = 0; i < p1_pieces_.size(); ++i) {
-        Piece piece = static_cast<Piece>(i);
-        int p1_count = 0, p2_count = 0;
-    
-        if (p1_pieces_.count(piece)) {
-            p1_count = p1_pieces_.at(piece);
-        }
-        if (p2_pieces_.count(piece)) {
-            p2_count = p2_pieces_.at(piece);
-        }
-    
-        if (p1_count != 0 || p2_count != 0) {
+    for (const auto& [piece, p1_count] : p1_pieces_) {
+        if (p1_count != 0 || p2_pieces_[piece] != 0) {
             allowed_pieces_.push_back(static_cast<int>(piece));
         }
     }
@@ -187,6 +182,37 @@ StrategoConfig::StrategoConfig(
     if (!valid) {
         throw std::invalid_argument(msg);
     }
+
+    std::ostringstream oss;
+
+    oss << "p1_deploy_mask\n";
+    for (size_t y = 0; y < height_; ++y) {
+        for (size_t x = 0; x < width_; ++x) {
+            oss << p1_deploy_mask_[y * width_ + x] ? "1 " : "0 ";
+        }
+        oss << "\n";
+    }
+    oss << "p2_deploy_mask\n";
+    for (size_t y = 0; y < height_; ++y) {
+        for (size_t x = 0; x < width_; ++x) {
+            oss << p2_deploy_mask_[y * width_ + x] ? "1 " : "0 ";
+        }
+        oss << "\n";
+    }
+    oss << "lakes_mask\n";
+    for (size_t y = 0; y < height_; ++y) {
+        for (size_t x = 0; x < width_; ++x) {
+            oss << lakes_mask_[y * width_ + x] ? "1 " : "0 ";
+        }
+        oss << "\n";
+    }
+
+    oss << "allowed_pieces: " << allowed_pieces_;
+    oss << "\ntotal_moves_limit: " + std::to_string(total_moves_limit_);
+    oss << "\nmoves_since_attack_limit_: " + std::to_string(moves_since_attack_limit_);
+    oss << "\nobserved_history_entries_: " + std::to_string(observed_history_entries_);
+
+    std::cout << oss.str() << std::endl;
 }
 
 StrategoConfig StrategoConfig::from_game_mode(GameMode mode) {

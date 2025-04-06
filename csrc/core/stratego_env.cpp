@@ -4,6 +4,10 @@
 #include <algorithm>
 #include <numeric>
 
+#include <sstream>
+#include <iostream>
+#include "prettyprint.hpp"
+
 void roll(std::vector<double>& vec, int shift) {
     if (vec.empty()) return;
     
@@ -74,7 +78,7 @@ void StrategoEnv::reset(uint32_t seed) {
     
     p1_.generate_state(p1_pieces_vec, config_->p1_deploy_mask(), 
                       observed_history_entries_, height_, width_);
-    p2_.generate_state(p2_pieces_vec, config_->p2_deploy_mask(),
+    p2_.generate_state(p2_pieces_vec, rotate_tile(config_->p2_deploy_mask_, false),
                       observed_history_entries_, height_, width_);
     
     // Сброс счётчиков
@@ -257,6 +261,25 @@ std::tuple<std::vector<double>, std::vector<bool>, int, bool, bool> StrategoEnv:
             
             board_[action[0] * width_ + action[1]] = deploy_piece;
             ++curr_player.deploy_idx_;
+
+            std::ostringstream oss;
+
+            oss << "urevealed" << curr_player.unrevealed_ << std::endl;
+            oss << "allowed_pieces" << allowed_pieces_ << std::endl;
+
+            oss << "board\n";
+            for (size_t y = 0; y < height_; ++y) {
+                for (size_t x = 0; x < width_; ++x) {
+                    oss << std::to_string(board_[y * width_ + x]);
+                }
+                oss << "\n";
+            }
+
+            oss << "deploy_piece: " << deploy_piece;
+            oss << "\naction[0]: " << std::to_string(action[0]) << "\naction[1]: " << std::to_string(action[1]);
+            oss << "\nindex: " << std::to_string(action[0] * width_ + action[1]);
+
+            std::cout << oss.str() << std::endl;
 
             bool curr_finish_deploy = curr_player.deploy_idx_ == std::accumulate(curr_player.unrevealed_.begin(), curr_player.unrevealed_.end(), 0);
             bool opp_finish_deploy = opp_player.deploy_idx_ == std::accumulate(opp_player.unrevealed_.begin(), opp_player.unrevealed_.end(), 0);
@@ -522,8 +545,11 @@ std::pair<bool, std::string> StrategoEnv::check_action_valid(const Pos& src, con
 }
 
 void StrategoEnv::valid_spots_to_place(std::vector<bool>& action_mask) const {
+    action_mask.clear();
+    action_mask.resize(height_ * width_, false);
+
     const auto& deploy_mask = (current_player_ == Player::RED) ? 
-        p1_.deploy_mask() : p2_.deploy_mask();
+        p1_.deploy_mask_ : p2_.deploy_mask_;
     
     for (size_t y = 0; y < height_; ++y) {
         for (size_t x = 0; x < width_; ++x) {
@@ -865,6 +891,16 @@ void StrategoEnv::rotate_tile_inplace(std::vector<T>& tile, bool neg) const {
     if (neg) {
         for (auto& elem : tile) {
             elem *= -1;
+        }
+    }
+}
+
+template<>
+void StrategoEnv::rotate_tile_inplace<bool>(std::vector<bool>& tile, bool neg) const {
+    std::reverse(tile.begin(), tile.end());
+    if (neg) {
+        for (size_t i = 0; i < tile.size(); ++i) {
+            tile[i] = !tile[i];
         }
     }
 }
