@@ -1,4 +1,3 @@
-
 from __future__ import annotations
 
 from enum import Enum, auto
@@ -23,8 +22,10 @@ class Piece(Enum):
     def __lt__(self, other: Piece):
         return self.value < other.value
 
+
 class Player(Enum):
     RED = 1
     BLUE = -1
+
 
 type Pos = tuple[int, int]

@@ -6,23 +6,32 @@ import pytest
 
 from stratego.core.primitives import Piece, Player, Pos
 from stratego.core.startego import GamePhase, StrategoEnv
-from tests.env.utils import SCOUT_ONLY, SPY_ONLY, move_fwd, repeat_twice, rotate_pos, validate_move
+from tests.env.utils import (
+    SCOUT_ONLY,
+    SPY_ONLY,
+    move_fwd,
+    repeat_twice,
+    rotate_pos,
+    validate_move,
+)
 
 
 @pytest.mark.parametrize(
-    "clockwise_first", 
+    "clockwise_first",
     itertools.product(
         [True, False],
-    )
+    ),
 )
-def test_scout_circle_chasing(env_5x5: Callable[[Any], StrategoEnv], clockwise_first: bool):
+def test_scout_circle_chasing(
+    env_5x5: Callable[[Any], StrategoEnv], clockwise_first: bool
+):
     """Position before the start of chasing:
     ....B
     .....
     ..L..
     .....
     R....
-    
+
     Chase initiation position:
     R...B
     .....
@@ -44,23 +53,29 @@ def test_scout_circle_chasing(env_5x5: Callable[[Any], StrategoEnv], clockwise_f
         repeat_twice(move_fwd, env, from_pos, to_pos)
         validate_move(env, piece, from_pos, to_pos)
         from_pos = to_pos
-    assert not env.chasing_detector.validate_move(Player.RED, piece, from_pos, chase_init_pos, env.board)
-    
+    assert not env.chasing_detector.validate_move(
+        Player.RED, piece, from_pos, chase_init_pos, env.board
+    )
+
     # counter-clockwise pursuit start
     chase_init_cc_pos = (4, 4)
     for to_pos in pos_list[::-1][1:]:
         repeat_twice(move_fwd, env, from_pos, to_pos)
         validate_move(env, piece, from_pos, to_pos)
         from_pos = to_pos
-    assert not env.chasing_detector.validate_move(Player.RED, piece, from_pos, chase_init_pos, env.board)
-    assert not env.chasing_detector.validate_move(Player.RED, piece, from_pos, chase_init_cc_pos, env.board)
-    
+    assert not env.chasing_detector.validate_move(
+        Player.RED, piece, from_pos, chase_init_pos, env.board
+    )
+    assert not env.chasing_detector.validate_move(
+        Player.RED, piece, from_pos, chase_init_cc_pos, env.board
+    )
+
 
 def test_scout_circle_chasing_two_step(env_5x5: Callable[[Any], StrategoEnv]):
     """A chase involving the midpoints of the board sides.
-    Since Blue does not get rid of the pursuit, but continues on the edge, 
+    Since Blue does not get rid of the pursuit, but continues on the edge,
     at this point he becomes the attacker, interrupting the sequence.
-    
+
     Chase initiation position:
     ....R
     .....
@@ -99,21 +114,25 @@ def test_scout_circle_chasing_two_step(env_5x5: Callable[[Any], StrategoEnv]):
         [SCOUT_ONLY, SPY_ONLY],
         range(5),
         [True, False],
-    )
+    ),
 )
-def test_three_square_chasing_opposition(env_5x5: Callable[[Any], StrategoEnv], pieces, red_from_col, red_attacker: bool):
+def test_three_square_chasing_opposition(
+    env_5x5: Callable[[Any], StrategoEnv], pieces, red_from_col, red_attacker: bool
+):
     env = env_5x5(pieces, lakes=[])
-    three_square_patterns = [np.roll(np.array([-1, 1]).repeat([2, 2]), i) for i in range(4)]
+    three_square_patterns = [
+        np.roll(np.array([-1, 1]).repeat([2, 2]), i) for i in range(4)
+    ]
     move_directions = [np.array([-1, 1]).repeat([rep, rep]) for rep in range(2, 5)]
     for move_direction in move_directions:
         for _ in range(len(move_direction)):
             move_direction = np.roll(move_direction, 1)
-            
+
             min_index = np.inf
             for pattern in three_square_patterns:
                 pat_len = len(pattern)
                 for i in range(len(move_direction) - pat_len + 1):
-                    if np.all(move_direction[i:i + pat_len] == pattern):
+                    if np.all(move_direction[i : i + pat_len] == pattern):
                         min_index = min(min_index, i)
                         break
             assert min_index != np.inf
@@ -142,22 +161,32 @@ def test_three_square_chasing_opposition(env_5x5: Callable[[Any], StrategoEnv], 
                 invalid_move = False
                 assert_passed = False
                 blue_to_pos = (blue_to_pos[0], blue_to_pos[1] + int(direction))
-                if blue_to_pos[0] < 0 or env.height <= blue_to_pos[0] or \
-                    blue_to_pos[1] < 0 or env.width <= blue_to_pos[1] or \
-                    env.lakes[blue_to_pos]:
+                if (
+                    blue_to_pos[0] < 0
+                    or env.height <= blue_to_pos[0]
+                    or blue_to_pos[1] < 0
+                    or env.width <= blue_to_pos[1]
+                    or env.lakes[blue_to_pos]
+                ):
                     invalid_move = True
                     break
                 red_to_pos = (red_to_pos[0], red_to_pos[1] - int(direction))
-                if red_to_pos[0] < 0 or env.height <= red_to_pos[0] or \
-                    red_to_pos[1] < 0 or env.width <= red_to_pos[1] or \
-                    env.lakes[red_to_pos]:
+                if (
+                    red_to_pos[0] < 0
+                    or env.height <= red_to_pos[0]
+                    or red_to_pos[1] < 0
+                    or env.width <= red_to_pos[1]
+                    or env.lakes[red_to_pos]
+                ):
                     invalid_move = True
                     break
                 if red_attacker:
                     move_fwd(env, blue_from_pos, blue_to_pos)
                     blue_from_pos = blue_to_pos
                     if len(env.chasing_detector.chase_moves) == 2 * min_index + 8:
-                        assert not env.chasing_detector.validate_move(Player.RED, piece, red_from_pos, red_to_pos, env.board)
+                        assert not env.chasing_detector.validate_move(
+                            Player.RED, piece, red_from_pos, red_to_pos, env.board
+                        )
                         assert_passed = True
                         break
                     move_fwd(env, red_from_pos, red_to_pos)
@@ -166,10 +195,16 @@ def test_three_square_chasing_opposition(env_5x5: Callable[[Any], StrategoEnv], 
                     move_fwd(env, red_from_pos, red_to_pos)
                     red_from_pos = red_to_pos
                     if len(env.chasing_detector.chase_moves) == 2 * min_index + 8:
-                        assert not env.chasing_detector.validate_move(Player.BLUE, piece, rotate_pos(blue_from_pos, 5, 5), rotate_pos(blue_to_pos, 5, 5), env.board)
+                        assert not env.chasing_detector.validate_move(
+                            Player.BLUE,
+                            piece,
+                            rotate_pos(blue_from_pos, 5, 5),
+                            rotate_pos(blue_to_pos, 5, 5),
+                            env.board,
+                        )
                         assert_passed = True
                         break
                     move_fwd(env, blue_from_pos, blue_to_pos)
                     blue_from_pos = blue_to_pos
-            
+
             assert invalid_move or assert_passed

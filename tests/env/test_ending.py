@@ -7,9 +7,16 @@ import pytest
 from stratego.core.primitives import Piece, Player, Pos
 from stratego.core.startego import GamePhase, StrategoEnv
 from tests.env.utils import (
-    FLAG_2BOMB_SCOUT, FLAG_2BOMB_SPY,
-    SCOUT_ONLY, SPY_ONLY, SCOUT_PAIR, SPY_PAIR,
-    move_fwd, repeat_twice, rotate_pos, validate_move
+    FLAG_2BOMB_SCOUT,
+    FLAG_2BOMB_SPY,
+    SCOUT_ONLY,
+    SPY_ONLY,
+    SCOUT_PAIR,
+    SPY_PAIR,
+    move_fwd,
+    repeat_twice,
+    rotate_pos,
+    validate_move,
 )
 
 
@@ -20,7 +27,7 @@ from tests.env.utils import (
         itertools.product(range(3, 5), range(5)),
         [True, False],
         [True, False],
-    )
+    ),
 )
 def test_lose_on_deploy_surrounded_lakes(
     env_5x5: Callable[[Any], StrategoEnv],
@@ -43,7 +50,12 @@ def test_lose_on_deploy_surrounded_lakes(
     p2_deploy_mask = ~lakes_mask
     p2_deploy_mask[3:] = False
 
-    env = env_5x5(pieces, lakes_mask=lakes_mask, p1_deploy_mask=p1_deploy_mask, p2_deploy_mask=p2_deploy_mask)
+    env = env_5x5(
+        pieces,
+        lakes_mask=lakes_mask,
+        p1_deploy_mask=p1_deploy_mask,
+        p2_deploy_mask=p2_deploy_mask,
+    )
     state, reward, terminated, truncated, info = env.step(from_pos)
     state, reward, terminated, truncated, info = env.step(from_pos)
 
@@ -62,6 +74,7 @@ def test_lose_on_deploy_surrounded_lakes(
         # not red_surrounded and not blue_surrounded
         pass
 
+
 @pytest.mark.parametrize(
     "pieces,from_pos,red_surrounded,blue_surrounded",
     itertools.product(
@@ -69,7 +82,7 @@ def test_lose_on_deploy_surrounded_lakes(
         itertools.product(range(3, 5), range(5)),
         [True, False],
         [True, False],
-    )
+    ),
 )
 def test_lose_on_deploy_surrounded_pieces_and_lakes(
     env_5x5: Callable[[Any], StrategoEnv],
@@ -86,14 +99,23 @@ def test_lose_on_deploy_surrounded_pieces_and_lakes(
     p2_deploy_mask = ~lakes_mask
     p2_deploy_mask[3:] = False
 
-    env = env_5x5(pieces, lakes_mask=lakes_mask, p1_deploy_mask=p1_deploy_mask, p2_deploy_mask=p2_deploy_mask)
+    env = env_5x5(
+        pieces,
+        lakes_mask=lakes_mask,
+        p1_deploy_mask=p1_deploy_mask,
+        p2_deploy_mask=p2_deploy_mask,
+    )
     deploy_direction = np.array([-1, 1, 0, 0])
     pieces_deployed = 0
     for direction in zip(deploy_direction, np.roll(deploy_direction, 2)):
         deploy_pos = (from_pos[0] + direction[0], from_pos[1] + direction[1])
-        if deploy_pos[0] < 0 or env.height <= deploy_pos[0] or \
-            deploy_pos[1] < 0 or env.width <= deploy_pos[1] or \
-            env.lakes[deploy_pos]:
+        if (
+            deploy_pos[0] < 0
+            or env.height <= deploy_pos[0]
+            or deploy_pos[1] < 0
+            or env.width <= deploy_pos[1]
+            or env.lakes[deploy_pos]
+        ):
             continue
         repeat_twice(env.step, deploy_pos)
         pieces_deployed += 1
@@ -140,13 +162,14 @@ def test_lose_on_deploy_surrounded_pieces_and_lakes(
         # not red_surrounded and not blue_surrounded
         pass
 
+
 @pytest.mark.parametrize(
     "pieces,red_stucked,blue_stucked",
     itertools.product(
         [SCOUT_ONLY, SPY_ONLY],
         [True, False],
         [True, False],
-    )
+    ),
 )
 def test_two_square_rule_piece_stucked(env_5x5, pieces, red_stucked, blue_stucked):
     """
@@ -167,7 +190,12 @@ def test_two_square_rule_piece_stucked(env_5x5, pieces, red_stucked, blue_stucke
     p1_deploy_mask &= ~lakes_mask
     p2_deploy_mask &= ~lakes_mask
 
-    env = env_5x5(pieces, lakes_mask=lakes_mask, p1_deploy_mask=p1_deploy_mask, p2_deploy_mask=p2_deploy_mask)
+    env = env_5x5(
+        pieces,
+        lakes_mask=lakes_mask,
+        p1_deploy_mask=p1_deploy_mask,
+        p2_deploy_mask=p2_deploy_mask,
+    )
     from_pos = (3, 0)
     repeat_twice(env.step, from_pos)
     piece = Piece(env.board[from_pos])
@@ -207,13 +235,14 @@ def test_two_square_rule_piece_stucked(env_5x5, pieces, red_stucked, blue_stucke
         # not red_stucked and not blue_stucked
         pass
 
+
 @pytest.mark.parametrize(
     "pieces,red_stucked,blue_stucked",
     itertools.product(
         [SCOUT_PAIR, SPY_PAIR],
         [True, False],
         [True, False],
-    )
+    ),
 )
 def test_two_square_rule_two_pieces_stucked(env_5x5, pieces, red_stucked, blue_stucked):
     """
@@ -235,7 +264,12 @@ def test_two_square_rule_two_pieces_stucked(env_5x5, pieces, red_stucked, blue_s
 
     _pieces = {Piece.BOMB: 2}
     _pieces.update(pieces)
-    env = env_5x5(_pieces, lakes_mask=lakes_mask, p1_deploy_mask=p1_deploy_mask, p2_deploy_mask=p2_deploy_mask)
+    env = env_5x5(
+        _pieces,
+        lakes_mask=lakes_mask,
+        p1_deploy_mask=p1_deploy_mask,
+        p2_deploy_mask=p2_deploy_mask,
+    )
     deploy_pos = [(3, 2), (3, 3), (4, 2), (4, 4)]
     for from_pos in deploy_pos:
         repeat_twice(env.step, from_pos)
@@ -275,13 +309,14 @@ def test_two_square_rule_two_pieces_stucked(env_5x5, pieces, red_stucked, blue_s
         # not red_stucked and not blue_stucked
         pass
 
+
 @pytest.mark.parametrize(
     "pieces,red_no_pieces,blue_no_pieces",
     itertools.product(
         [SCOUT_PAIR, SPY_PAIR],
         [True, False],
         [True, False],
-    )
+    ),
 )
 def test_no_pieces_left(env_5x5, pieces, red_no_pieces, blue_no_pieces):
     """
@@ -335,12 +370,13 @@ def test_no_pieces_left(env_5x5, pieces, red_no_pieces, blue_no_pieces):
         # not red_no_pieces and not blue_no_pieces
         pass
 
+
 @pytest.mark.parametrize(
     "pieces,red_attacker",
     itertools.product(
         [SCOUT_PAIR, SPY_PAIR],
         [True, False],
-    )
+    ),
 )
 def test_no_pieces_left_on_trade(env_5x5, pieces, red_attacker):
     """
@@ -383,12 +419,13 @@ def test_no_pieces_left_on_trade(env_5x5, pieces, red_attacker):
     assert env.game_phase == GamePhase.TERMINAL
     assert reward == 0
 
+
 @pytest.mark.parametrize(
     "pieces,red_attacker",
     itertools.product(
         [FLAG_2BOMB_SCOUT, FLAG_2BOMB_SPY],
         [True, False],
-    )
+    ),
 )
 def test_flag_captured(env_5x5, pieces, red_attacker):
     """
@@ -430,12 +467,13 @@ def test_flag_captured(env_5x5, pieces, red_attacker):
     assert env.game_phase == GamePhase.TERMINAL
     assert reward == 1
 
+
 @pytest.mark.parametrize(
     "pieces,total_moves_limit",
     itertools.product(
         [SCOUT_ONLY, SPY_ONLY],
         range(1, 11),
-    )
+    ),
 )
 def test_total_moves_limit(env_5x5, pieces, total_moves_limit):
     lakes_mask = np.zeros((5, 5), dtype=bool)
@@ -447,7 +485,12 @@ def test_total_moves_limit(env_5x5, pieces, total_moves_limit):
     p1_deploy_mask &= ~lakes_mask
     p2_deploy_mask &= ~lakes_mask
 
-    env = env_5x5(pieces, lakes_mask=lakes_mask, p1_deploy_mask=p1_deploy_mask, p2_deploy_mask=p2_deploy_mask)
+    env = env_5x5(
+        pieces,
+        lakes_mask=lakes_mask,
+        p1_deploy_mask=p1_deploy_mask,
+        p2_deploy_mask=p2_deploy_mask,
+    )
     env.total_moves_limit = total_moves_limit
 
     repeat_twice(env.step, env.action_space.sample())
@@ -459,12 +502,13 @@ def test_total_moves_limit(env_5x5, pieces, total_moves_limit):
     assert env.game_phase == GamePhase.TERMINAL
     assert reward == 0
 
+
 @pytest.mark.parametrize(
     "pieces,moves_since_attack_limit",
     itertools.product(
         [SCOUT_PAIR, SPY_PAIR],
         range(1, 11),
-    )
+    ),
 )
 def test_moves_since_attack_limit(env_5x5, pieces, moves_since_attack_limit):
     """
@@ -493,9 +537,14 @@ def test_moves_since_attack_limit(env_5x5, pieces, moves_since_attack_limit):
 
     _pieces = {Piece.BOMB: 1}
     _pieces.update(pieces)
-    env = env_5x5(_pieces, lakes_mask=lakes_mask, p1_deploy_mask=p1_deploy_mask, p2_deploy_mask=p2_deploy_mask)
+    env = env_5x5(
+        _pieces,
+        lakes_mask=lakes_mask,
+        p1_deploy_mask=p1_deploy_mask,
+        p2_deploy_mask=p2_deploy_mask,
+    )
     env.moves_since_attack_limit = moves_since_attack_limit
-    
+
     deploy_pos = [(1, 4), (4, 0), (4, 4)]
     for from_pos in deploy_pos:
         repeat_twice(env.step, from_pos)

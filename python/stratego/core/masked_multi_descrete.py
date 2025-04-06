@@ -1,6 +1,7 @@
 import numpy as np
 from gymnasium.spaces import MultiDiscrete
 
+
 class MaskedMultiDiscrete(MultiDiscrete):
     """
     A custom MultiDiscrete that supports masking during sampling.
