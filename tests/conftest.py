@@ -1,11 +1,17 @@
+import sys
+import os
+
 import pytest
 
-from stratego_gym.envs.config import (
+project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+sys.path.insert(0, os.path.join(project_root, "python"))
+
+from stratego.core.config import (
     StrategoConfig, GameMode, 
     PLACES_TO_DEPLOY_RED_ORIGINAL, PLACES_TO_DEPLOY_BLUE_ORIGINAL, LAKES_ORIGINAL
 )
-from stratego_gym.envs.primitives import Piece
-from stratego_gym.envs.startego import StrategoEnv
+from stratego.core.primitives import Piece
+from stratego.core.startego import StrategoEnv
 
 @pytest.fixture()
 def env_original() -> StrategoEnv:

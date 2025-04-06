@@ -4,8 +4,8 @@ from typing import Any, Callable
 import numpy as np
 import pytest
 
-from stratego_gym.envs.primitives import Piece, Player, Pos
-from stratego_gym.envs.startego import GamePhase, StrategoEnv
+from stratego.core.primitives import Piece, Player, Pos
+from stratego.core.startego import GamePhase, StrategoEnv
 from tests.env.utils import (
     FLAG_2BOMB_SCOUT, FLAG_2BOMB_SPY,
     SCOUT_ONLY, SPY_ONLY, SCOUT_PAIR, SPY_PAIR,

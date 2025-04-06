@@ -1,5 +1,5 @@
-from stratego_gym.envs.primitives import Piece, Pos
-from stratego_gym.envs.startego import StrategoEnv
+from stratego.core.primitives import Piece, Pos
+from stratego.core.startego import StrategoEnv
 
 
 SCOUT_ONLY = {

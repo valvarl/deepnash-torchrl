@@ -1,5 +1,5 @@
 import numpy as np
-import stratego_cpp  # Скомпилированный модуль
+from stratego.cpp import stratego_cpp  # Скомпилированный модуль
 
 class StrategoEnvWrapper:
     def __init__(self, config=None):

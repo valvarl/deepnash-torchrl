@@ -3,8 +3,8 @@ import itertools
 import numpy as np
 import pytest
 
-from stratego_gym.envs.primitives import Player
-from stratego_gym.envs.startego import StrategoEnv, GamePhase
+from stratego.core.primitives import Player
+from stratego.core.startego import StrategoEnv, GamePhase
 
 def test_single_trajectory_rollout(env_original: StrategoEnv):
     terminated = False

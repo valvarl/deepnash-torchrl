@@ -5,8 +5,8 @@ import pytest
 
 import numpy as np
 
-from stratego_gym.envs.primitives import Piece, Player
-from stratego_gym.envs.startego import GamePhase, StrategoEnv
+from stratego.core.primitives import Piece, Player
+from stratego.core.startego import GamePhase, StrategoEnv
 from tests.env.utils import (
     SCOUT_ONLY, SCOUT_PAIR, SPY_ONLY, SPY_PAIR, 
     move_bwd, move_fwd, repeat_twice, validate_move,

@@ -5,7 +5,7 @@ from enum import Enum
 
 import numpy as np
 
-from stratego_gym.envs.primitives import Piece, Pos
+from stratego.core.primitives import Piece, Pos
 
 PIECES_NUM_ORIGINAL = {
     Piece.FLAG: 1,

@@ -1,1 +1,0 @@
-from stratego_gym.envs.startego import StrategoEnv

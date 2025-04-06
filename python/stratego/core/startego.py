@@ -5,10 +5,10 @@ import numpy as np
 from gymnasium import Env, spaces
 import pygame
 
-from stratego_gym.envs.config import StrategoConfig, GameMode
-from stratego_gym.envs.detectors import TwoSquareDetector, ChasingDetector
-from stratego_gym.envs.masked_multi_descrete import MaskedMultiDiscrete
-from stratego_gym.envs.primitives import Piece, Player, Pos
+from stratego.core.config import StrategoConfig, GameMode
+from stratego.core.detectors import TwoSquareDetector, ChasingDetector
+from stratego.core.masked_multi_descrete import MaskedMultiDiscrete
+from stratego.core.primitives import Piece, Player, Pos
 
 
 class GamePhase(Enum):

@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from stratego_gym.envs.primitives import Piece, Player, Pos
+from stratego.core.primitives import Piece, Player, Pos
 
 @dataclass
 class ChaseEntry:
