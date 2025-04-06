@@ -60,7 +60,6 @@ public:
     const std::vector<bool>& lakes() const { return lakes_; }
     GamePhase game_phase() const { return game_phase_; }
     Player current_player() const { return current_player_; }
-    const PlayerStateHandler& player_state(Player player) const;
 
     const size_t height() const { return height_; }
     const size_t width() const { return width_; }
@@ -97,6 +96,9 @@ private:
     void rotate_tile_inplace(std::vector<T>& tile, bool neg = true) const;
     
     inline Pos rotate_coord(const Pos& pos) const;
+    
+    inline const PlayerStateHandler& player_state(Player player, bool opponent = false) const;
+    inline void switch_current_player();
 };
 
 #endif // STRATEGO_ENV_H

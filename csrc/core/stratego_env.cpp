@@ -111,13 +111,13 @@ void StrategoEnv::generate_observation(std::vector<double> &obs) const {
     if (game_phase_ == GamePhase::DEPLOY) {
         obs.resize(obs.size() + (allowed_pieces_.size() * 2 + observed_history_entries_) * height_ * width_, 0.0);
     } else {
-        std::vector<double> public_obs, opp_public_obs, move_matrix;
-        const PlayerStateHandler& cur = current_player_ == Player::RED ? p1_ : p2_;
-        const PlayerStateHandler& opp = current_player_ == Player::RED ? p2_ : p1_;
+        std::vector<double> public_obs, opp_public_obs;
+        const PlayerStateHandler& cur = player_state(current_player_);
+        const PlayerStateHandler& opp = player_state(current_player_, true);
         
         get_public_obs(cur.public_obs_info(), cur.unrevealed(), cur.pieces(), cur.movable_pieces(), public_obs);
         get_public_obs(opp.public_obs_info(), opp.unrevealed(), opp.pieces(), opp.movable_pieces(), opp_public_obs);
-        (current_player_ == Player::RED ? p1_ : p2_).observed_moves();
+        const std::vector<double>& move_matrix = player_state(current_player_).observed_moves();
         
         obs.insert(obs.end(), public_obs.begin(), public_obs.end());
         obs.insert(obs.end(), opp_public_obs.begin(), opp_public_obs.end());
@@ -138,7 +138,7 @@ void StrategoEnv::generate_observation(std::vector<double> &obs) const {
     }
 
     // 5. last_selected
-    const Pos& last_selected = current_player_ == Player::RED ? p1_.last_selected() : p2_.last_selected();
+    const Pos& last_selected = player_state(current_player_).last_selected();
     for (size_t i = 0; i < height_; ++i) {
         for (size_t j = 0; j < width_; ++j) {
             obs.push_back((i == last_selected[0] && j == last_selected[1]) ? 1.0 : 0.0);
@@ -264,13 +264,13 @@ std::tuple<std::vector<double>, std::vector<bool>, int, bool, bool> StrategoEnv:
 
             std::ostringstream oss;
 
-            oss << "urevealed" << curr_player.unrevealed_ << std::endl;
-            oss << "allowed_pieces" << allowed_pieces_ << std::endl;
+            // oss << "urevealed: " << curr_player.unrevealed_ << std::endl;
+            // oss << "allowed_pieces: " << allowed_pieces_ << std::endl;
 
             oss << "board\n";
             for (size_t y = 0; y < height_; ++y) {
                 for (size_t x = 0; x < width_; ++x) {
-                    oss << std::to_string(board_[y * width_ + x]);
+                    oss << std::to_string(board_[y * width_ + x]) << "\t";
                 }
                 oss << "\n";
             }
@@ -288,13 +288,14 @@ std::tuple<std::vector<double>, std::vector<bool>, int, bool, bool> StrategoEnv:
             } else if (curr_finish_deploy && opp_finish_deploy) {
                 std::vector<bool> action_mask;
                 valid_pieces_to_select(action_mask, true);
-                bool opp_no_moves = std::any_of(action_mask.begin(), action_mask.end(), [](bool x) { return x; });
-                if (opp_no_moves) {
-                    action_mask.clear();
+                // std::cout << action_mask << std::endl;
+                bool opp_has_moves = std::any_of(action_mask.begin(), action_mask.end(), [](bool x) { return x; });
+                // std::cout << opp_no_moves << std::endl;
+                if (!opp_has_moves) {
                     valid_pieces_to_select(action_mask, false);
                     bool draw_game = std::any_of(action_mask.begin(), action_mask.end(), [](bool x) { return x; });
+                    reward = static_cast<int>(draw_game);
                     game_phase_ = GamePhase::TERMINAL;
-                    reward = draw_game ? 0 : 1;
                     terminated = true;
                     break;
                 }
@@ -312,7 +313,7 @@ std::tuple<std::vector<double>, std::vector<bool>, int, bool, bool> StrategoEnv:
                 }
             }
             rotate_tile_inplace<int8_t>(board_);
-            current_player_ = (current_player_ == Player::RED) ? Player::BLUE : Player::RED;
+            switch_current_player();
             break;
         }
         case GamePhase::SELECT: {
@@ -332,17 +333,20 @@ std::tuple<std::vector<double>, std::vector<bool>, int, bool, bool> StrategoEnv:
             auto src = (current_player_ == Player::RED) ? p1_.last_selected() : p2_.last_selected();
             auto dest = action;
             
-            auto valid = check_action_valid(src, dest);
-            if (!valid.first) {
+            auto [valid, msg] = check_action_valid(src, dest);
+            if (!valid) {
                 // action = action_space_.sample();
                 // dest = action;
-                throw std::invalid_argument(valid.second);
+                throw std::invalid_argument(msg);
             }
 
             auto& curr_player = (current_player_ == Player::RED) ? p1_ : p2_;
             auto& opp_player = (current_player_ == Player::RED) ? p2_ : p1_;
 
             curr_player.last_selected_ = action;
+
+            // std::cout << "SRC: " << static_cast<int>(src[0]) << " " <<  static_cast<int>(src[1]) << std::endl;
+            // std::cout << "DEST: " << static_cast<int>(dest[0]) << " " <<  static_cast<int>(dest[1]) << std::endl;
 
             int8_t src_piece_val = board_[src[0] * width_ + src[1]];
             int8_t dest_piece_val = board_[dest[0] * width_ + dest[1]];
@@ -352,7 +356,7 @@ std::tuple<std::vector<double>, std::vector<bool>, int, bool, bool> StrategoEnv:
                 moves_since_attack_ >= moves_since_attack_limit_) {
                 terminated = true;
                 rotate_tile_inplace<int8_t>(board_);
-                current_player_ = (current_player_ == Player::RED) ? Player::BLUE : Player::RED;
+                switch_current_player();
                 game_phase_ = GamePhase::TERMINAL;
                 break;
             }
@@ -381,7 +385,12 @@ std::tuple<std::vector<double>, std::vector<bool>, int, bool, bool> StrategoEnv:
             }
             chasing_detector_.update(current_player_, static_cast<Piece>(src_piece_val), _src, _dest, board_, height_, width_);
 
-            if (src_piece_val = -dest_piece_val) { // Equal Strength
+            // std::cout << "MOVE " << static_cast<int>(src_piece_val) << " " << static_cast<int>(dest_piece_val) << std::endl;
+            // std::cout << (src_piece_val > -dest_piece_val);
+            // std::cout << (((src_piece_val > -dest_piece_val) && ((src_piece_val == static_cast<int8_t>(Piece::MINER) && dest_piece_val == -static_cast<int8_t>(Piece::BOMB)) || 
+            // dest_piece_val != -static_cast<int8_t>(Piece::BOMB))) ? "good" : "bad") << std::endl;
+
+            if (src_piece_val == -dest_piece_val) { // Equal Strength
                 // remove both pieces
                 board_[src[0] * width_ + src[1]] = 0;
                 board_[dest[0] * width_ + dest[1]] = 0;
@@ -394,9 +403,9 @@ std::tuple<std::vector<double>, std::vector<bool>, int, bool, bool> StrategoEnv:
                 curr_player.unrevealed_[src_piece_val]--;
                 opp_player.unrevealed_[dest_piece_val]--;
             } else if ((src_piece_val == static_cast<int8_t>(Piece::SPY) && dest_piece_val == -static_cast<int8_t>(Piece::MARSHAL)) ||  // Spy vs Marshal
-                       (src_piece_val > -dest_piece_val && (src_piece_val == static_cast<int8_t>(Piece::MINER) && dest_piece_val == -static_cast<int8_t>(Piece::BOMB) || 
-                        dest_piece_val != -static_cast<int8_t>(Piece::BOMB))) ||  // attacker is stronger (+Bomb case)
-                       (dest_piece_val == -static_cast<int8_t>(Piece::FLAG))) {  // enemy Flag found
+                       (src_piece_val > -dest_piece_val && (
+                            src_piece_val == static_cast<int8_t>(Piece::MINER) && dest_piece_val == -static_cast<int8_t>(Piece::BOMB) || 
+                            dest_piece_val != -static_cast<int8_t>(Piece::BOMB)))) {  // attacker is stronger (+Bomb case)
                 // remove enemy piece
                 board_[src[0] * width_ + src[1]] = 0;
                 board_[dest[0] * width_ + dest[1]] = src_piece_val;
@@ -435,23 +444,24 @@ std::tuple<std::vector<double>, std::vector<bool>, int, bool, bool> StrategoEnv:
                 opp_player.public_obs_info_[2][dest_rot[0] * width_ + dest_rot[1]] = dest_piece_val;
                 curr_player.unrevealed_[src_piece_val]--;
                 opp_player.unrevealed_[dest_piece_val]--;
+            } else {
+                throw std::runtime_error("Move was left unprocessed");
             }
             
             rotate_tile_inplace<int8_t>(board_);
-            current_player_ = (current_player_ == Player::RED) ? Player::BLUE : Player::RED;
+            switch_current_player();
 
             // Check if any pieces can be moved. If one player has no movable pieces, the other player wins.
             // If both players have no movable pieces, the game is a draw.
             if (!terminated) {
                 std::vector<bool> action_mask;
                 valid_pieces_to_select(action_mask, false);
-                bool curr_no_moves = std::any_of(action_mask.begin(), action_mask.end(), [](bool x) { return x; });
-                if (curr_no_moves) {
+                bool curr_has_moves = std::any_of(action_mask.begin(), action_mask.end(), [](bool x) { return x; });
+                if (!curr_has_moves) {
                     action_mask.clear();
                     valid_pieces_to_select(action_mask, true);
-                    bool draw_game = std::any_of(action_mask.begin(), action_mask.end(), [](bool x) { return x; });
+                    reward = static_cast<int>(std::any_of(action_mask.begin(), action_mask.end(), [](bool x) { return x; }));
                     game_phase_ = GamePhase::TERMINAL;
-                    reward = draw_game ? 0 : 1;
                     terminated = true;
                     break;
                 }
@@ -469,9 +479,9 @@ std::tuple<std::vector<double>, std::vector<bool>, int, bool, bool> StrategoEnv:
 }
 
 inline std::pair<bool, std::string> StrategoEnv::validate_coord(const Pos& coord) const {
-    if (coord[0] < 0 or coord[0] >= height_) {
+    if (coord[0] < 0 || coord[0] >= height_) {
         return {false, "Source row is out of bounds"};
-    } else if (coord[1] < 0 or coord[1] >= width_) {
+    } else if (coord[1] < 0 || coord[1] >= width_) {
         return {false, "Source column is out of bounds"};
     }
     return {true, ""};
@@ -491,15 +501,17 @@ std::pair<bool, std::string> StrategoEnv::check_action_valid(const Pos& src, con
     int8_t src_piece_val = board_[src[0] * width_ + src[1]];
     int8_t dest_piece_val = board_[dest[0] * width_ + dest[1]];
 
+    // std::cout << static_cast<int>(src_piece_val) << " " << static_cast<int>(dest_piece_val);
+
     if (src_piece_val < static_cast<int8_t>(Piece::SPY)) {
         return {false, "Selected piece cannot be moved by player"};
     }
 
-    if (abs(dest_piece_val) == static_cast<int8_t>(Piece::SPY)) {
+    if (abs(dest_piece_val) == static_cast<int8_t>(Piece::LAKE)) {
         return {false, "Destination is an obstacle"};
     }
     
-    if (dest_piece_val > static_cast<int8_t>(Piece::SPY)) {
+    if (dest_piece_val > static_cast<int8_t>(Piece::LAKE)) {
         return {false, "Destination is already occupied by player's piece"};
     }
     
@@ -548,8 +560,7 @@ void StrategoEnv::valid_spots_to_place(std::vector<bool>& action_mask) const {
     action_mask.clear();
     action_mask.resize(height_ * width_, false);
 
-    const auto& deploy_mask = (current_player_ == Player::RED) ? 
-        p1_.deploy_mask_ : p2_.deploy_mask_;
+    const auto& deploy_mask = player_state(current_player_).deploy_mask();
     
     for (size_t y = 0; y < height_; ++y) {
         for (size_t x = 0; x < width_; ++x) {
@@ -718,7 +729,7 @@ void StrategoEnv::valid_destinations(std::vector<bool>& action_mask) const {
         return;
     }
 
-    const Pos& selected = (current_player_ == Player::RED) ? p1_.last_selected() : p2_.last_selected();
+    const Pos& selected = player_state(current_player_).last_selected();
     int8_t selected_piece_val = board_[selected[0] * width_ + selected[1]];
 
     // Initialize masks
@@ -877,6 +888,10 @@ Pos StrategoEnv::get_random_action() const {
     return {static_cast<int8_t>(idx / width_), static_cast<int8_t>(idx % width_)};
 }
 
+inline const PlayerStateHandler& StrategoEnv::player_state(Player player, bool opponent) const {
+    return current_player_ == Player::RED ^ opponent ? p1_ : p2_;
+}
+
 template <typename T>
 std::vector<T> StrategoEnv::rotate_tile(const std::vector<T>& tile, bool neg) const {
     std::vector<T> result;
@@ -907,4 +922,8 @@ void StrategoEnv::rotate_tile_inplace<bool>(std::vector<bool>& tile, bool neg) c
 
 inline Pos StrategoEnv::rotate_coord(const Pos& pos) const {
     return {static_cast<int8_t>(height_ - pos[0] - 1), static_cast<int8_t>(width_ - pos[1] - 1)};
+}
+
+inline void StrategoEnv::switch_current_player() {
+    current_player_ = (current_player_ == Player::RED) ? Player::BLUE : Player::RED;
 }
