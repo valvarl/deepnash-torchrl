@@ -3,7 +3,8 @@ import gymnasium as gym
 import time
 import numpy as np
 from stratego.core.primitives import Piece, Player
-from stratego.core.stratego import WINDOW_SIZE, GamePhase
+from stratego.core.stratego import GamePhase
+from stratego.core.stratego_base import WINDOW_SIZE
 
 from tests.conftest import env_5x5
 

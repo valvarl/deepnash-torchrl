@@ -59,7 +59,7 @@ class StrategoConfigCpp(StrategoConfigBase):
         if p2_deploy_mask is not None:
             args["p2_deploy_mask"] = p2_deploy_mask_cpp
 
-        self.config = sp.StrategoConfig(**args)
+        self._config_cpp = sp.StrategoConfig(**args)
 
     def _pieces_to_cpp(self, pieces: dict[Piece, int]) -> dict[sp.Piece, int] | None:
         if pieces is None:
@@ -78,3 +78,19 @@ class StrategoConfigCpp(StrategoConfigBase):
             for x in range(width):
                 mask_cpp[y * width + x] = bool(mask[y][x])
         return mask_cpp
+
+    @property
+    def height(self):
+        return self._config_cpp.height
+
+    @property
+    def width(self):
+        return self._config_cpp.width
+
+    @property
+    def observed_history_entries(self):
+        return self._config_cpp.observed_history_entries
+
+    @property
+    def allowed_pieces(self):
+        return self._config_cpp.allowed_pieces

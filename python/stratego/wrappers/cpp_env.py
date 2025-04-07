@@ -1,29 +1,99 @@
+import typing as tp
+
 import numpy as np
-from stratego.cpp import stratego_cpp  # Скомпилированный модуль
+from gymnasium import spaces
+
+from stratego.core.config import GameMode
+from stratego.core.masked_multi_descrete import MaskedMultiDiscrete
+from stratego.core.primitives import Player
+from stratego.core.stratego import GamePhase, StrategoEnvBase
+from stratego.wrappers.cpp_config import StrategoConfigCpp
+
+from stratego.cpp import stratego_cpp as sp
 
 
-class StrategoEnvWrapper:
-    def __init__(self, config=None):
-        self._cpp_env = stratego_cpp.StrategoEnv(config)
+class StrategoEnvCpp(StrategoEnvBase):
+    def __init__(
+        self, config: StrategoConfigCpp | None = None, render_mode: str | None = None
+    ):
+        self._config = config
+        if config is None:
+            self._config = StrategoConfigCpp.from_game_mode(GameMode.ORIGINAL)
 
-    def reset(self, seed=None):
-        obs = self._cpp_env.reset(seed or 0)
-        return self._convert_observation(obs)
+        self._env_cpp = sp.StrategoEnv(self._config._config_cpp)
+
+        self.observation_space = self._get_observation_space()
+        self.action_space: MaskedMultiDiscrete = self._get_action_space()
+
+    def _get_observation_space(self):
+        observation_channels = (
+            len(self._config.allowed_pieces) * 3
+            + self._config.observed_history_entries
+            + 6
+        )
+        shape = (observation_channels, self._config.height, self._config.width)
+        mask_shape = (self._config.height, self._config.width)
+
+        return spaces.Dict(
+            {
+                "obs": spaces.Box(low=-3, high=1, shape=shape, dtype=np.float64),
+                "action_mask": spaces.Box(
+                    low=0, high=1, shape=mask_shape, dtype=np.int64
+                ),
+            }
+        )
+
+    def _get_action_space(self):
+        if getattr(self, "action_space", None) is None:
+            return MaskedMultiDiscrete((self.height, self.width), dtype=np.int64)
+        else:
+            return self.action_space
+
+    def reset(self, seed=None, options=None):
+        if seed is None:
+            seed = 35
+
+        super().reset(seed=seed, options=options)
+
+        if (
+            getattr(self, "height", None) != self._config.height
+            or getattr(self, "width", None) != self._config.width
+        ):
+            del self.action_space
+            self.height = self._config.height
+            self.width = self._config.width
+            self.action_space = self._get_action_space()
+
+        obs = self._env_cpp.reset(seed=seed)
+        return obs
 
     def step(self, action):
-        obs, reward, terminated, truncated = self._cpp_env.step(action)
-        return self._convert_observation(obs), reward, terminated, truncated
+        obs = self._env_cpp.step(action)
+        return obs
 
-    def _convert_observation(self, cpp_obs):
-        # Конвертация C++ observation в numpy array
-        return np.array(cpp_obs, dtype=np.float32)
-
-    @property
-    def action_space(self):
-        # Возвращаем пространство действий
-        ...
+    def get_info(self) -> dict[str : tp.Any]:
+        return self._env_cpp.get_info()
 
     @property
-    def observation_space(self):
-        # Возвращаем пространство наблюдений
-        ...
+    def height(self) -> int:
+        return self._env_cpp.height
+
+    @property
+    def width(self) -> int:
+        return self._env_cpp.width
+
+    @property
+    def game_phase(self) -> GamePhase:
+        return self._env_cpp.game_phase
+
+    @property
+    def current_player(self) -> Player:
+        return self._env_cpp.current_player
+
+    @property
+    def board(self) -> np.ndarray:
+        return self._env_cpp.board
+
+    @property
+    def lakes(self) -> np.ndarray:
+        return self._env_cpp.lakes
