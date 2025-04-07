@@ -1,12 +1,12 @@
 #include "stratego_config.h"
+
 #include <algorithm>
 #include <format>
-#include <stdexcept>
-
-
-#include "prettyprint.hpp"
 #include <iostream>
 #include <sstream>
+#include <stdexcept>
+
+#include "prettyprint.hpp"
 
 
 // Static member initialization
@@ -179,7 +179,6 @@ GameMode game_mode)
   moves_since_attack_limit_ (moves_since_attack_limit),
   observed_history_entries_ (observed_history_entries),
   allow_competitive_deploy_ (allow_competitive_deploy), game_mode_ (game_mode) {
-
     allowed_pieces_.clear ();
     for (const auto& [piece, p1_count] : p1_pieces_) {
         if (p1_count != 0 || p2_pieces_[piece] != 0) {

@@ -1,18 +1,17 @@
 #ifndef STRATEGO_ENV_H
 #define STRATEGO_ENV_H
 
-#include "detectors.h"
-#include "masked_multi_discrete.h"
-#include "player_state_handler.h"
-#include "primitives.h"
-#include "stratego_config.h"
-
-
 #include <array>
 #include <memory>
 #include <optional>
 #include <unordered_map>
 #include <vector>
+
+#include "detectors.h"
+#include "masked_multi_discrete.h"
+#include "player_state_handler.h"
+#include "primitives.h"
+#include "stratego_config.h"
 
 
 class StrategoEnv {

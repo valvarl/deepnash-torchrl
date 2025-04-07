@@ -1,6 +1,8 @@
 #include "masked_multi_discrete.h"
+
 #include <numeric>
 #include <stdexcept>
+
 
 // Реализация конструктора
 MaskedMultiDiscrete::MaskedMultiDiscrete (const std::vector<int>& nvec, uint32_t seed)

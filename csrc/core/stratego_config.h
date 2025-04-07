@@ -1,11 +1,12 @@
 #ifndef STRATEGO_CONFIG_H
 #define STRATEGO_CONFIG_H
 
-#include "primitives.h"
 #include <array>
 #include <memory>
 #include <unordered_map>
 #include <vector>
+
+#include "primitives.h"
 
 
 class StrategoEnv;

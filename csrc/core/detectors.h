@@ -1,10 +1,11 @@
 #ifndef DETECTORS_H
 #define DETECTORS_H
 
-#include "primitives.h"
 #include <memory>
 #include <utility>
 #include <vector>
+
+#include "primitives.h"
 
 
 class StrategoEnv;

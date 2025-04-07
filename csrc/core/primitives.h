@@ -26,7 +26,7 @@ enum class Piece : int8_t {
     MARSHAL    = 13
 };
 
-inline bool operator<(Piece lhs, Piece rhs) {
+inline bool operator< (Piece lhs, Piece rhs) {
     return static_cast<int8_t> (lhs) < static_cast<int8_t> (rhs);
 }
 

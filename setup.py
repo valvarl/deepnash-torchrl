@@ -17,7 +17,9 @@ class CMakeBuild(build_ext):
     def build_extension(self, ext):
         # 📍 Имя модуля (например, stratego.cpp.stratego_cpp)
         ext_name = ext.name  # stratego.cpp.stratego_cpp
-        ext_path = Path(self.get_ext_fullpath(ext_name))  # полный путь, где setuptools ожидает .so
+        ext_path = Path(
+            self.get_ext_fullpath(ext_name)
+        )  # полный путь, где setuptools ожидает .so
 
         cfg = "Release"
         build_temp = Path(self.build_temp) / ext.name
@@ -36,7 +38,9 @@ class CMakeBuild(build_ext):
             cmake_args += ["-DCMAKE_POSITION_INDEPENDENT_CODE=ON"]
 
         subprocess.check_call(["cmake", ext.sourcedir] + cmake_args, cwd=build_temp)
-        subprocess.check_call(["cmake", "--build", ".", "--target", "stratego_cpp"], cwd=build_temp)
+        subprocess.check_call(
+            ["cmake", "--build", ".", "--target", "stratego_cpp"], cwd=build_temp
+        )
 
 
 setup(
@@ -44,7 +48,9 @@ setup(
     version="0.1.0",
     author="Varlachev Valery",
     description="Stratego environment with C++ backend and Python training pipeline",
-    ext_modules=[CMakeExtension("stratego.cpp.stratego_cpp")],  # 💡 это Python-импорт-путь
+    ext_modules=[
+        CMakeExtension("stratego.cpp.stratego_cpp")
+    ],  # 💡 это Python-импорт-путь
     cmdclass={"build_ext": CMakeBuild},
     packages=find_packages("python"),
     package_dir={"": "python"},

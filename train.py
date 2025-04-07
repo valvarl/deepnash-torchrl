@@ -1,4 +1,3 @@
-
 import logging
 import numpy as np
 from tensordict.nn import TensorDictModule
@@ -10,18 +9,21 @@ from tqdm import tqdm
 from deepnash.nn import DeepNashAgent
 from deepnash.learn.rnad import RNaDSolver
 from deepnash.learn.config import RNaDConfig
-from deepnash.stratego_gym.envs.config import StrategoConfig
-from deepnash.stratego_gym.envs.primitives import Piece
-from deepnash.stratego_gym.envs.startego import GamePhase  # must be importable on the driver side too
+from stratego.core.config import StrategoConfig
+from stratego.core.primitives import Piece
+from stratego.core.startego import (
+    GamePhase,
+)  # must be importable on the driver side too
 
-MAP_4x4 = np.array([[0, 0, 0, 0],
-                    [0, 0, 0, 1],
-                    [0, 0, 0, 0],
-                    [0, 0, 0, 0]], dtype=bool)
+MAP_4x4 = np.array([[0, 0, 0, 0], [0, 0, 0, 1], [0, 0, 0, 0], [0, 0, 0, 0]], dtype=bool)
 
 LIMITED_PIECE_SET = {Piece.FLAG: 1, Piece.SPY: 1, Piece.SCOUT: 1, Piece.MARSHAL: 1}
-PLACES_TO_DEPLOY_RED = [((3, 0), (3, 3)),]
-PLACES_TO_DEPLOY_BLUE = [((0, 0), (0, 3)),]
+PLACES_TO_DEPLOY_RED = [
+    ((3, 0), (3, 3)),
+]
+PLACES_TO_DEPLOY_BLUE = [
+    ((0, 0), (0, 3)),
+]
 TEST_CONFIG = StrategoConfig(
     height=4,
     width=4,
@@ -31,17 +33,23 @@ TEST_CONFIG = StrategoConfig(
     lakes_mask=MAP_4x4,
 )
 
+
 # 1. Create environment factory
 def env_maker(config=TEST_CONFIG, render_mode=None):
     reader = default_info_dict_reader(["cur_player", "game_phase"])
-    return GymEnv("stratego_gym/Stratego-v0", config=config, render_mode=render_mode).set_info_dict_reader(reader)
+    return GymEnv(
+        "stratego_gym/Stratego-v0", config=config, render_mode=render_mode
+    ).set_info_dict_reader(reader)
+
 
 @torch.no_grad
 def evaluate_random(policy: TensorDictModule):
     env = env_maker().to("cuda")
     device = policy.device
     policy = policy.to("cuda")
-    env.set_info_dict_reader(default_info_dict_reader(["cur_player", "game_phase", "cur_board"]))
+    env.set_info_dict_reader(
+        default_info_dict_reader(["cur_player", "game_phase", "cur_board"])
+    )
     win_count = 0
     draw_count = 0
     for i in tqdm(range(100)):
@@ -52,7 +60,7 @@ def evaluate_random(policy: TensorDictModule):
             # if i < 10: print("------------------------")
             # if i < 10: print(f"Game Phase: {tensordict['game_phase'].item()}")
             # if i < 10: print(f"Cur Player: {tensordict['cur_player'].item()}")
-            game_phase = tensordict['game_phase'].item()
+            game_phase = tensordict["game_phase"].item()
 
             try:
                 if tensordict["cur_player"] == policy_turn:
@@ -80,7 +88,10 @@ def evaluate_random(policy: TensorDictModule):
             if tensordict["terminated"]:
                 # if i < 10: print(f"Won Game? {-policy_turn == tensordict['cur_player']}")
                 # if i < 10: print(f"Draw Game? {(tensordict['reward'] == 0).item()}")
-                win_count += int(-policy_turn == tensordict["cur_player"]) * tensordict["reward"].item()
+                win_count += (
+                    int(-policy_turn == tensordict["cur_player"])
+                    * tensordict["reward"].item()
+                )
                 draw_count += 1 - tensordict["reward"].item()
                 break
 
@@ -98,7 +109,11 @@ if __name__ == "__main__":
     torch.autograd.set_detect_anomaly(True)
     logging.basicConfig(level=logging.DEBUG)
 
-    solver = RNaDSolver(config=RNaDConfig(game_name="stratego"), wandb=True, directory_name="250326_2357")
+    solver = RNaDSolver(
+        config=RNaDConfig(game_name="stratego"),
+        wandb=True,
+        directory_name="250326_2357",
+    )
     solver.run(env_maker, evaluate_fn=evaluate_random)
 
     # for name, param in policy.named_parameters():

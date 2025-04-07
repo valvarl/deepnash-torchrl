@@ -1,10 +1,11 @@
 #ifndef PLAYER_STATE_HANDLER_H
 #define PLAYER_STATE_HANDLER_H
 
-#include "primitives.h"
 #include <array>
 #include <memory>
 #include <vector>
+
+#include "primitives.h"
 
 
 class StrategoEnv;

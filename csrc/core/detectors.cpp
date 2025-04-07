@@ -1,6 +1,9 @@
 #include "detectors.h"
-#include "primitives.h"
+
 #include <algorithm>
+
+#include "primitives.h"
+
 
 // ChasingDetector implementation
 bool ChasingDetector::is_adjacent (const Pos& pos1, const Pos& pos2) const {
@@ -55,7 +58,6 @@ const Pos& pos,
 const std::vector<int8_t>& board,
 size_t height,
 size_t width) const {
-
     if (chase_moves_.empty () || chase_moves_.back ().attacker) {
         return { true, {} };
     }
@@ -68,7 +70,6 @@ size_t width) const {
         if (chasing_move.player == player && chasing_move.piece == piece &&
         chased_move.from_pos == chase_moves_.back ().to_pos &&
         check_chasing_condition (piece, pos, chasing_move.to_pos, board, height, width)) {
-
             if ((chase_moves_.size () - 1) / 2 == i + 1 &&
             chase_moves_[chase_moves_.size () - 2].from_pos == chasing_move.to_pos) {
                 continue;
@@ -123,7 +124,6 @@ size_t width) {
         chase_moves_.back ().attacker ? chase_moves_.back ().piece : piece,
         chase_moves_.back ().attacker ? to_pos : from_pos,
         chase_moves_.back ().to_pos, board, height, width)) {
-
         // Chase continues
         if (!chase_moves_.back ().attacker &&
         !validate_move (player, piece, from_pos, to_pos, board, height, width)) {
@@ -144,7 +144,6 @@ Player player) const {
 
 std::pair<bool, std::pair<Pos, Pos>>
 TwoSquareDetector::validate_select (Player player, Piece piece, const Pos& pos) const {
-
     const auto& p = get_player_moves (player);
     if (p.size () < 3) {
         return { true, {} };
@@ -221,7 +220,6 @@ void TwoSquareDetector::update (Player player, Piece piece, const Pos& from_pos,
         to_pos[idx] < end_pos[idx]) ||
     (start_pos[idx] > end_pos[idx] && end_pos[idx] < to_pos[idx] &&
     to_pos[idx] <= start_pos[idx])) {
-
         if (validate_move (player, piece, from_pos, to_pos)) {
             p.emplace_back (from_pos, to_pos);
         } else {

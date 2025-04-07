@@ -1,13 +1,13 @@
 #include "stratego_env.h"
+
 #include <algorithm>
+#include <iostream>
 #include <numeric>
 #include <random>
+#include <sstream>
 #include <stdexcept>
 
-
 #include "prettyprint.hpp"
-#include <iostream>
-#include <sstream>
 
 
 void roll (std::vector<double>& vec, int shift) {
@@ -351,8 +351,8 @@ StrategoEnv::step (const Pos& action) {
         break;
     }
     case GamePhase::MOVE: {
-        auto src  = (current_player_ == Player::RED) ? p1_.last_selected () :
-                                                       p2_.last_selected ();
+        auto src = (current_player_ == Player::RED) ? p1_.last_selected () :
+                                                      p2_.last_selected ();
         auto dest = action;
 
         auto [valid, msg] = check_action_valid (src, dest);

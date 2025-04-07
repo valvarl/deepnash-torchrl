@@ -1,5 +1,7 @@
 #include "player_state_handler.h"
+
 #include <algorithm>
+
 
 PlayerStateHandler::PlayerStateHandler (Player player, size_t height, size_t width)
 : player_ (player), deploy_idx_ (0), last_selected_ ({ -1, -1 }),
@@ -11,7 +13,6 @@ const std::vector<bool>& deploy_mask,
 size_t observed_history_entries,
 size_t height,
 size_t width) {
-
     // Reset state
     pieces_.clear ();
     movable_pieces_.clear ();

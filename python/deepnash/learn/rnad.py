@@ -9,7 +9,11 @@ from tensordict.nn import TensorDictModule
 import torch
 from torch import nn
 from torch import optim, Tensor
-from torchrl.collectors import MultiaSyncDataCollector, SyncDataCollector, MultiSyncDataCollector
+from torchrl.collectors import (
+    MultiaSyncDataCollector,
+    SyncDataCollector,
+    MultiSyncDataCollector,
+)
 from torchrl.envs import ParallelEnv
 import wandb
 
@@ -41,7 +45,7 @@ def kld(
 
 class RNaDSolver:
     def __init__(
-        self, 
+        self,
         config: RNaDConfig,
         device=torch.device("cuda"),
         directory_name=None,
@@ -65,14 +69,17 @@ class RNaDSolver:
         if not os.path.exists(saved_runs_dir):
             os.mkdir(saved_runs_dir)
         self.directory = os.path.join(
-            os.path.dirname(os.path.realpath(__file__)), "..", "saved_runs", directory_name
+            os.path.dirname(os.path.realpath(__file__)),
+            "..",
+            "saved_runs",
+            directory_name,
         )
         self.use_same_init_net_as = use_same_init_net_as
 
         self.m = 0
         self.n = 0
         self.learner_steps = 0  # saved in checkpoint
-        self.actor_steps = 0 
+        self.actor_steps = 0
         self.policy: DeepNashAgent = None
         self.policy_target: DeepNashAgent = None
         self.policy_prev: DeepNashAgent = None
@@ -118,7 +125,9 @@ class RNaDSolver:
                 )
                 checkpoint = torch.load(policy_dir)
                 self.policy.load_state_dict(checkpoint["policy"])
-                logging.info("Loading init net from {}".format(self.use_same_init_net_as))
+                logging.info(
+                    "Loading init net from {}".format(self.use_same_init_net_as)
+                )
             self.policy.train()
             self.policy_target = self.__new_net()
             self.policy_target.load_state_dict(self.policy.state_dict())
@@ -130,20 +139,20 @@ class RNaDSolver:
             # The machinery related to updating parameters/learner.
             self._entropy_schedule = EntropySchedule(
                 sizes=self.config.entropy_schedule_size,
-                repeats=self.config.entropy_schedule_repeats)
-            
+                repeats=self.config.entropy_schedule_repeats,
+            )
+
             # Main network optimizer with Adam and gradient clipping
             self.optimizer = optim.Adam(
                 self.policy.parameters(),
                 lr=self.config.learning_rate,
                 betas=(self.config.adam.b1, self.config.adam.b2),
-                eps=self.config.adam.eps
+                eps=self.config.adam.eps,
             )
-            
+
             # Target network optimizer with SGD for Polyak averaging
             self.optimizer_target = optim.SGD(
-                self.policy_target.parameters(),
-                lr=self.config.target_network_avg
+                self.policy_target.parameters(), lr=self.config.target_network_avg
             )
             self.m = 0
             self.n = 0
@@ -152,11 +161,13 @@ class RNaDSolver:
 
         else:
 
-            params_dict = torch.load(os.path.join(self.directory, "params"), weights_only=False)
+            params_dict = torch.load(
+                os.path.join(self.directory, "params"), weights_only=False
+            )
             for key, value in params_dict.items():
                 if key == "directory_name":
                     params_dict[key] = self.directory_name
-                    # renaming the directory will update the saved value for 'directory_name' 
+                    # renaming the directory will update the saved value for 'directory_name'
                     continue
                 if key == "device":
                     # resuming a run with a new device will move the nets to that device
@@ -191,7 +202,9 @@ class RNaDSolver:
         Updates the net weights, optimizer state, and certain stat members from those saved in the checkpoint
         """
 
-        saved_dict = torch.load(os.path.join(self.directory, str(m), str(n)), weights_only=False)
+        saved_dict = torch.load(
+            os.path.join(self.directory, str(m), str(n)), weights_only=False
+        )
         self.learner_steps = saved_dict["learner_steps"]
         self.actor_steps = saved_dict["actor_steps"]
         self.policy = self.__new_net()
@@ -206,12 +219,11 @@ class RNaDSolver:
             self.policy.parameters(),
             lr=self.config.learning_rate,
             betas=(self.config.adam.b1, self.config.adam.b2),
-            eps=self.config.adam.eps
+            eps=self.config.adam.eps,
         )
         self.optimizer.load_state_dict(saved_dict["optimizer"])
         self.optimizer_target = optim.SGD(
-            self.policy_target.parameters(),
-            lr=self.config.target_network_avg
+            self.policy_target.parameters(), lr=self.config.target_network_avg
         )
         self.optimizer_target.load_state_dict(saved_dict["optimizer_target"])
         self._entropy_schedule = saved_dict["_entropy_schedule"]
@@ -238,10 +250,15 @@ class RNaDSolver:
 
         def rollout(policy, data):
             output = policy(data)
-            return output["policy"], output["value"], output["log_probs"], output["logits"]
+            return (
+                output["policy"],
+                output["value"],
+                output["log_probs"],
+                output["logits"],
+            )
 
         pi, v, log_pi, logit = rollout(self.policy, batch)
-        policy_pprocessed = pi # TODO
+        policy_pprocessed = pi  # TODO
         v_target_list, has_played_list, v_trace_policy_target_list = [], [], []
 
         with torch.no_grad():
@@ -262,7 +279,7 @@ class RNaDSolver:
                     lambda_=1.0,
                     c=self.config.c_vtrace,
                     rho=torch.inf,
-                    eta=self.config.eta_reward_transform
+                    eta=self.config.eta_reward_transform,
                 )
                 v_target_list.append(v_target_)
                 has_played_list.append(has_played)
@@ -285,15 +302,17 @@ class RNaDSolver:
         legal_actions = batch["action_mask"]
         legal_actions = legal_actions.reshape(*legal_actions.shape[:-2], -1)
         loss_nerd = get_loss_nerd(
-            [logit] * 2, [pi] * 2,
+            [logit] * 2,
+            [pi] * 2,
             v_trace_policy_target_list,
             valid,
             batch["cur_player"],
             legal_actions,
             importance_sampling_correction,
             clip=self.config.nerd.clip,
-            threshold=self.config.nerd.beta)
-        
+            threshold=self.config.nerd.beta,
+        )
+
         loss = loss_v + loss_nerd
 
         # print("Checking gradients BEFORE backward pass:")
@@ -320,10 +339,16 @@ class RNaDSolver:
             logit_mean = logit.mean().item()
             logit_max_from_mean = torch.max(torch.abs(logit - logit_mean)).item()
 
-            uniform_policy = torch.nn.functional.normalize(legal_actions.float(), p=1, dim=-1)
+            uniform_policy = torch.nn.functional.normalize(
+                legal_actions.float(), p=1, dim=-1
+            )
             entropy = kld(pi, uniform_policy, valid, legal_actions=legal_actions)
-            entropy_target = kld(pi_target, uniform_policy, valid, legal_actions=legal_actions)
-            actor_learner_kld = kld(pi, batch["policy"], valid, legal_actions=legal_actions)
+            entropy_target = kld(
+                pi_target, uniform_policy, valid, legal_actions=legal_actions
+            )
+            actor_learner_kld = kld(
+                pi, batch["policy"], valid, legal_actions=legal_actions
+            )
 
             to_log = {
                 "loss_v": loss_v.detach().item(),
@@ -342,7 +367,7 @@ class RNaDSolver:
         nn.utils.clip_grad_norm_(self.policy.parameters(), self.config.clip_gradient)
 
         return logs
-    
+
     def __step(self, batch, logs_enabled=False):
         self.optimizer.zero_grad()
         logs = self.__calc_loss(batch, logs_enabled=logs_enabled)
@@ -350,7 +375,9 @@ class RNaDSolver:
 
         self.optimizer_target.zero_grad()
         with torch.no_grad():
-            for param_t, param_m in zip(self.policy_target.parameters(), self.policy.parameters()):
+            for param_t, param_m in zip(
+                self.policy_target.parameters(), self.policy.parameters()
+            ):
                 # "Difference" = (target - main). This is our "pseudo-gradient".
                 param_t.grad = (param_t - param_m).detach().clone()
 
@@ -367,7 +394,7 @@ class RNaDSolver:
         self.learner_steps += 1
 
         return logs
-    
+
     def __resume(
         self,
         collector,
@@ -387,7 +414,7 @@ class RNaDSolver:
         expl_mod:
             Compute NashConv of the target net after this many steps, starting at m=0.
         log_mod:
-            Compute logs during learning after this many steps, starting at m=0. 
+            Compute logs during learning after this many steps, starting at m=0.
         """
         for updates, data in enumerate(collector):
             if updates >= max_updates:
@@ -395,10 +422,12 @@ class RNaDSolver:
 
             if self.m > sum(self.config.entropy_schedule_repeats):
                 break
-            
+
             if self.n % expl_mod == 0:
                 eval_logs = evaluate_fn(self.policy)
-                logging.info(f"win: {eval_logs['win']}, draw: {eval_logs['draw']}, loss: {eval_logs['loss']}")
+                logging.info(
+                    f"win: {eval_logs['win']}, draw: {eval_logs['draw']}, loss: {eval_logs['loss']}"
+                )
                 if self.wandb:
                     wandb.log(eval_logs, step=self.learner_steps)
 
@@ -409,11 +438,11 @@ class RNaDSolver:
             if self.n % checkpoint_mod == 0:
                 self.__save_checkpoint()
                 collector.update_policy_weights_()
-            
+
             logs = self.__step(data, logs_enabled=self.n % log_mod == 0 and self.wandb)
             if logs:
                 wandb.log(logs, step=self.learner_steps)
-    
+
     def run(
         self,
         env_maker,
@@ -432,7 +461,9 @@ class RNaDSolver:
         # Define the number of collectors and workers per collector
         num_collectors = 4
         workers_per_collector = 4
-        envs = [ParallelEnv(workers_per_collector, env_maker) for _ in range(num_collectors)]
+        envs = [
+            ParallelEnv(workers_per_collector, env_maker) for _ in range(num_collectors)
+        ]
 
         # Initialize the MultiaSyncDataCollector
         collector = SyncDataCollector(

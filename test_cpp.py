@@ -1,36 +1,25 @@
 import sys
 import os
+
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "python")))
 
 from stratego.cpp import stratego_cpp as sp
 
 # Define pieces for each player (Spy and Flag only)
-p1_pieces = {
-    sp.Piece.SPY: 1,
-    sp.Piece.FLAG: 1
-}
+p1_pieces = {sp.Piece.SPY: 1, sp.Piece.FLAG: 1}
 
-p2_pieces = {
-    sp.Piece.SPY: 1,
-    sp.Piece.FLAG: 1
-}
+p2_pieces = {sp.Piece.SPY: 1, sp.Piece.FLAG: 1}
 
 init_from_mask = True
 
 if not init_from_mask:
     # Define lake position (center 2x2 area)
-    lakes = [
-        ([[1, 3], [1, 3]])
-    ]
+    lakes = [[[1, 3], [1, 3]]]
 
     # Define deployment areas (top and bottom rows)
-    p1_deploy = [
-        ([3, 0], [3, 3])
-    ]
+    p1_deploy = [([3, 0], [3, 3])]
 
-    p2_deploy = [
-        ([0, 0], [0, 3])
-    ]
+    p2_deploy = [([0, 0], [0, 3])]
     # Create config
     config = sp.StrategoConfig(
         height=4,
@@ -42,7 +31,7 @@ if not init_from_mask:
         p2_places_to_deploy=p2_deploy,
         total_moves_limit=100,
         moves_since_attack_limit=20,
-        observed_history_entries=10
+        observed_history_entries=10,
     )
 else:
     height = 4
@@ -76,7 +65,7 @@ else:
         p2_deploy_mask=p2_deploy_mask,
         total_moves_limit=100,
         moves_since_attack_limit=20,
-        observed_history_entries=10
+        observed_history_entries=10,
     )
 
 env = sp.StrategoEnv(config)

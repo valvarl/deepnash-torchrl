@@ -3,24 +3,32 @@ import torch
 import torch.nn as nn
 from torch import Tensor, BoolTensor
 
-from stratego_gym.envs.primitives import Piece
+from stratego.core.primitives import Piece
+
 
 class ConvResBlock(nn.Module):
     def __init__(self, in_channels, out_channels, stride=1):
         super(ConvResBlock, self).__init__()
         self.layers = nn.Sequential(
-            nn.Conv2d(in_channels, out_channels // 2, kernel_size=3, stride=stride, padding=1),
+            nn.Conv2d(
+                in_channels, out_channels // 2, kernel_size=3, stride=stride, padding=1
+            ),
             nn.ReLU(),
-            nn.Conv2d(out_channels // 2, out_channels, kernel_size=3, stride=1, padding=1),
-            nn.ReLU()
+            nn.Conv2d(
+                out_channels // 2, out_channels, kernel_size=3, stride=1, padding=1
+            ),
+            nn.ReLU(),
         )
 
-        self.res_conv = nn.Conv2d(in_channels, out_channels, kernel_size=1, stride=stride)
+        self.res_conv = nn.Conv2d(
+            in_channels, out_channels, kernel_size=1, stride=stride
+        )
 
-    '''
+    """
     The forward method of the ConvResBlock takes an input tensor x
     and returns the output and skip-out connection
-    '''
+    """
+
     def forward(self, x):
         residual = x
         out = self.layers(x) + self.res_conv(residual)
@@ -30,10 +38,16 @@ class ConvResBlock(nn.Module):
 class DeconvResBlock(nn.Module):
     def __init__(self, in_channels, out_channels, stride=1):
         super(DeconvResBlock, self).__init__()
-        self.deconv1 = nn.ConvTranspose2d(in_channels, out_channels // 2, kernel_size=3, stride=stride, padding=1)
+        self.deconv1 = nn.ConvTranspose2d(
+            in_channels, out_channels // 2, kernel_size=3, stride=stride, padding=1
+        )
         self.relu1 = nn.ReLU()
-        self.skip_in = nn.LazyConvTranspose2d(out_channels // 2, kernel_size=1, stride=stride)
-        self.deconv2 = nn.ConvTranspose2d(out_channels // 2, out_channels, kernel_size=3, stride=1, padding=1)
+        self.skip_in = nn.LazyConvTranspose2d(
+            out_channels // 2, kernel_size=1, stride=stride
+        )
+        self.deconv2 = nn.ConvTranspose2d(
+            out_channels // 2, out_channels, kernel_size=3, stride=1, padding=1
+        )
         self.relu2 = nn.ReLU()
 
     def forward(self, x, skip_in=None):
@@ -45,17 +59,30 @@ class DeconvResBlock(nn.Module):
         x = self.relu2(x)
         return x
 
+
 class PyramidModule(nn.Module):
     def __init__(self, inner_channels, outer_channels, N, M, stride=1):
         super(PyramidModule, self).__init__()
-        self.initial_conv = nn.LazyConv2d(outer_channels, kernel_size=3, stride=1, padding=1)
+        self.initial_conv = nn.LazyConv2d(
+            outer_channels, kernel_size=3, stride=1, padding=1
+        )
         self.relu = nn.ReLU()
-        self.outer_conv_blocks = nn.ModuleList([ConvResBlock(outer_channels, outer_channels) for _ in range(N)])
+        self.outer_conv_blocks = nn.ModuleList(
+            [ConvResBlock(outer_channels, outer_channels) for _ in range(N)]
+        )
         self.strided_conv = ConvResBlock(outer_channels, inner_channels, stride=stride)
-        self.inner_conv_blocks = nn.ModuleList([ConvResBlock(inner_channels, inner_channels) for _ in range(M)])
-        self.inner_deconv_blocks = nn.ModuleList([DeconvResBlock(inner_channels, inner_channels) for _ in range(M)])
-        self.strided_deconv = DeconvResBlock(inner_channels, outer_channels, stride=stride)
-        self.outer_deconv_blocks = nn.ModuleList([DeconvResBlock(outer_channels, outer_channels) for _ in range(N)])
+        self.inner_conv_blocks = nn.ModuleList(
+            [ConvResBlock(inner_channels, inner_channels) for _ in range(M)]
+        )
+        self.inner_deconv_blocks = nn.ModuleList(
+            [DeconvResBlock(inner_channels, inner_channels) for _ in range(M)]
+        )
+        self.strided_deconv = DeconvResBlock(
+            inner_channels, outer_channels, stride=stride
+        )
+        self.outer_deconv_blocks = nn.ModuleList(
+            [DeconvResBlock(outer_channels, outer_channels) for _ in range(N)]
+        )
 
     def forward(self, x):
         x = self.initial_conv(x)
@@ -92,9 +119,7 @@ def legal_policy(logits: torch.Tensor, legal_actions: torch.Tensor) -> torch.Ten
 
     # Exponentiate only the legal actions.
     exp_logits = torch.where(
-        legal_actions != 0,
-        torch.exp(masked_logits),
-        torch.zeros_like(masked_logits)
+        legal_actions != 0, torch.exp(masked_logits), torch.zeros_like(masked_logits)
     )
     # Normalize.
     denom = exp_logits.sum(dim=-1, keepdim=True)
@@ -103,6 +128,7 @@ def legal_policy(logits: torch.Tensor, legal_actions: torch.Tensor) -> torch.Ten
         assert False, "Legal Policy is Invalid!"
         # breakpoint()
     return policy
+
 
 def legal_log_policy(logits: torch.Tensor, legal_actions: torch.Tensor) -> torch.Tensor:
     """Return the log of the policy on legal actions, 0 on illegal ones."""
@@ -135,25 +161,25 @@ class DeepNashNet(nn.Module):
         self.pyramid = PyramidModule(inner_channels, outer_channels, N, M)
         self.deployment_head = nn.Sequential(
             PyramidModule(inner_channels, outer_channels, 1, 0),
-            nn.Conv2d(outer_channels,1, kernel_size=3, padding=1),
+            nn.Conv2d(outer_channels, 1, kernel_size=3, padding=1),
             nn.ReLU(),
             nn.Flatten(start_dim=-3, end_dim=-1),
         )
         self.selection_head = nn.Sequential(
             PyramidModule(inner_channels, outer_channels, 1, 0),
-            nn.Conv2d(outer_channels,1, kernel_size=3, padding=1),
+            nn.Conv2d(outer_channels, 1, kernel_size=3, padding=1),
             nn.Flatten(start_dim=-3, end_dim=-1),
         )
         self.movement_head = nn.Sequential(
             PyramidModule(inner_channels, outer_channels, 1, 0),
-            nn.Conv2d(outer_channels,1, kernel_size=3, padding=1),
+            nn.Conv2d(outer_channels, 1, kernel_size=3, padding=1),
             nn.Flatten(start_dim=-3, end_dim=-1),
         )
         self.value_head = nn.Sequential(
             PyramidModule(inner_channels, outer_channels, 0, 0),
-            nn.Conv2d(outer_channels,1, kernel_size=3, padding=1),
+            nn.Conv2d(outer_channels, 1, kernel_size=3, padding=1),
             nn.Flatten(start_dim=-3, end_dim=-1),
-            nn.LazyLinear(1)
+            nn.LazyLinear(1),
         )
 
         self.device = next(self.parameters()).device
@@ -161,9 +187,15 @@ class DeepNashNet(nn.Module):
         # TODO: get pieces as argument
         self.pieces = np.array([Piece(i) for i in range(2, 14)])
         invalid_piece_ids = [Piece.FLAG, Piece.BOMB]  # Define invalid piece IDs
-        valid_piece_ids = np.setdiff1d(self.pieces, invalid_piece_ids)  # Exclude invalid pieces
-        self.valid_mask = torch.tensor([id_ in valid_piece_ids for id_ in self.pieces], dtype=torch.bool, device=self.device,
-                                       requires_grad=False)  # Create a mask for valid piece IDs
+        valid_piece_ids = np.setdiff1d(
+            self.pieces, invalid_piece_ids
+        )  # Exclude invalid pieces
+        self.valid_mask = torch.tensor(
+            [id_ in valid_piece_ids for id_ in self.pieces],
+            dtype=torch.bool,
+            device=self.device,
+            requires_grad=False,
+        )  # Create a mask for valid piece IDs
 
     def forward(self, state, action_mask):
         # print(f"State NaNs: {torch.isnan(state).any()}, Infs: {torch.isinf(state).any()}")
@@ -189,33 +221,51 @@ class DeepNashNet(nn.Module):
         board_embed = self.pyramid(state)  # shape: (..., C, H, W)
         # print(f"board_embed NaNs: {torch.isnan(board_embed).any()}, Infs: {torch.isinf(board_embed).any()}")
 
-        tiled_no_attack = state[..., -4:-3, :, :] # shape: (... 1, H, W)
+        tiled_no_attack = state[..., -4:-3, :, :]  # shape: (... 1, H, W)
 
-        one_hot_last_selected = state[..., 1:num_pieces + 1, :, :] # shape: (..., num_pieces, H, W)
-        one_hot_last_selected = one_hot_last_selected[..., self.valid_mask, :, :] # shape: (..., num_movable_pieces, H, W)
-        one_hot_last_selected = one_hot_last_selected * state[..., -1:, :, :] # shape: (..., num_movable_pieces, H, W)
+        one_hot_last_selected = state[
+            ..., 1 : num_pieces + 1, :, :
+        ]  # shape: (..., num_pieces, H, W)
+        one_hot_last_selected = one_hot_last_selected[
+            ..., self.valid_mask, :, :
+        ]  # shape: (..., num_movable_pieces, H, W)
+        one_hot_last_selected = (
+            one_hot_last_selected * state[..., -1:, :, :]
+        )  # shape: (..., num_movable_pieces, H, W)
 
         # Calculate game phase tensors
-        finished_deploying = state[..., -3:-2, :, :] # shape: (..., 1, H, W)
-        moving_piece = state[..., -2:-1, :, :] # shape: (..., 1, H, W)
+        finished_deploying = state[..., -3:-2, :, :]  # shape: (..., 1, H, W)
+        moving_piece = state[..., -2:-1, :, :]  # shape: (..., 1, H, W)
         game_phase_tensor = (2 * moving_piece + finished_deploying).long()
-        game_phase_tensor = game_phase_tensor.flatten(start_dim=-2) # shape (..., 1, H * W)
+        game_phase_tensor = game_phase_tensor.flatten(
+            start_dim=-2
+        )  # shape (..., 1, H * W)
         # print(f"Game Phase Tensor: {game_phase_tensor.unique()}")
 
         # Compute policies -> shape: (..., 1 * H * W)
         deployment_logits = self.deployment_head(board_embed)
-        selection_logits = self.selection_head(torch.cat((board_embed, tiled_no_attack), dim=-3))
-        movement_logits = self.movement_head(torch.cat((board_embed, tiled_no_attack, one_hot_last_selected), dim=-3))
+        selection_logits = self.selection_head(
+            torch.cat((board_embed, tiled_no_attack), dim=-3)
+        )
+        movement_logits = self.movement_head(
+            torch.cat((board_embed, tiled_no_attack, one_hot_last_selected), dim=-3)
+        )
         # print(f"Deployment Logits: {torch.isnan(deployment_logits).any()}")
         # print(f"Selection Logits: {torch.isnan(selection_logits).any()}")
         # print(f"Movement Logits: {torch.isnan(movement_logits).any()}")
 
-        all_logits = torch.stack([deployment_logits, selection_logits, movement_logits], dim=-2) # shape: (..., 3, 1 * H * W)
-        logits = torch.gather(all_logits, dim=-2, index=game_phase_tensor) # shape: (..., 1, 1 * H * W)
-        logits = torch.squeeze(logits, dim=-2) # shape: (..., H * W)
+        all_logits = torch.stack(
+            [deployment_logits, selection_logits, movement_logits], dim=-2
+        )  # shape: (..., 3, 1 * H * W)
+        logits = torch.gather(
+            all_logits, dim=-2, index=game_phase_tensor
+        )  # shape: (..., 1, 1 * H * W)
+        logits = torch.squeeze(logits, dim=-2)  # shape: (..., H * W)
 
         # Action Masking
-        action_mask = action_mask.flatten(start_dim=-2, end_dim=-1).bool() # shape: (..., H * W)
+        action_mask = action_mask.flatten(
+            start_dim=-2, end_dim=-1
+        ).bool()  # shape: (..., H * W)
         masked_policy = legal_policy(logits, action_mask)
         masked_log_probs = legal_log_policy(logits, action_mask)
         # print(f"Masked Policy NaNs: {torch.isnan(masked_policy).any()}")
@@ -226,14 +276,23 @@ class DeepNashNet(nn.Module):
         # masked_log_probs = nn.functional.log_softmax(masked_logits, dim=-1)
 
         # Compute value -> shape: (..., 1)
-        value = self.value_head(torch.cat((board_embed,
-                                          tiled_no_attack * finished_deploying * moving_piece,
-                                          one_hot_last_selected * moving_piece), dim=-3))
+        value = self.value_head(
+            torch.cat(
+                (
+                    board_embed,
+                    tiled_no_attack * finished_deploying * moving_piece,
+                    one_hot_last_selected * moving_piece,
+                ),
+                dim=-3,
+            )
+        )
 
         if len(leading_shape) > 1:
             masked_policy = masked_policy.view(*leading_shape, *masked_policy.shape[1:])
             value = value.view(*leading_shape, *value.shape[1:])
-            masked_log_probs = masked_log_probs.view(*leading_shape, *masked_log_probs.shape[1:])
+            masked_log_probs = masked_log_probs.view(
+                *leading_shape, *masked_log_probs.shape[1:]
+            )
             logits = logits.view(*leading_shape, *logits.shape[1:])
 
         return masked_policy, value, masked_log_probs, logits
