@@ -410,13 +410,7 @@ StrategoEnv::step (const Pos& action) {
         chasing_detector_.update (current_player_,
         static_cast<Piece> (src_piece_val), _src, _dest, board_, height_, width_);
 
-        // std::cout << "MOVE " << static_cast<int>(src_piece_val) << " " <<
-        // static_cast<int>(dest_piece_val) << std::endl; std::cout <<
-        // (src_piece_val > -dest_piece_val); std::cout << (((src_piece_val >
-        // -dest_piece_val) && ((src_piece_val ==
-        // static_cast<int8_t>(Piece::MINER) && dest_piece_val ==
-        // -static_cast<int8_t>(Piece::BOMB)) || dest_piece_val !=
-        // -static_cast<int8_t>(Piece::BOMB))) ? "good" : "bad") << std::endl;
+        std::cout << "WARNING: check dest_piece_val negative\n";
 
         if (src_piece_val == -dest_piece_val) { // Equal Strength
             // remove both pieces
@@ -429,7 +423,7 @@ StrategoEnv::step (const Pos& action) {
                 opp_player.public_obs_info_[k][dest_rot[0] * width_ + dest_rot[1]] = 0;
             }
             curr_player.unrevealed_[src_piece_val]--;
-            opp_player.unrevealed_[dest_piece_val]--;
+            opp_player.unrevealed_[-dest_piece_val]--;
         } else if ((src_piece_val == static_cast<int8_t> (Piece::SPY) &&
                    dest_piece_val == -static_cast<int8_t> (Piece::MARSHAL)) || // Spy vs Marshal
         (src_piece_val > -dest_piece_val &&
@@ -448,7 +442,7 @@ StrategoEnv::step (const Pos& action) {
                     opp_player.public_obs_info_[k][dest_rot[0] * width_ + dest_rot[1]] = 0;
                 }
                 curr_player.unrevealed_[src_piece_val]--;
-                opp_player.unrevealed_[dest_piece_val]--;
+                opp_player.unrevealed_[-dest_piece_val]--;
             } else {
                 bool scout_move = (src[0] == dest[0] && abs (src[1] - dest[1]) > 1) ||
                 (src[1] == dest[1] && abs (src[0] - dest[0]) > 1);
@@ -473,9 +467,9 @@ StrategoEnv::step (const Pos& action) {
             for (int k = 0; k < 2; ++k) {
                 opp_player.public_obs_info_[k][dest_rot[0] * width_ + dest_rot[1]] = 0;
             }
-            opp_player.public_obs_info_[2][dest_rot[0] * width_ + dest_rot[1]] = dest_piece_val;
+            opp_player.public_obs_info_[2][dest_rot[0] * width_ + dest_rot[1]] = -dest_piece_val;
             curr_player.unrevealed_[src_piece_val]--;
-            opp_player.unrevealed_[dest_piece_val]--;
+            opp_player.unrevealed_[-dest_piece_val]--;
         } else {
             throw std::runtime_error ("Move was left unprocessed");
         }
