@@ -351,8 +351,8 @@ StrategoEnv::step (const Pos& action) {
         break;
     }
     case GamePhase::MOVE: {
-        auto src = (current_player_ == Player::RED) ? p1_.last_selected () :
-                                                      p2_.last_selected ();
+        auto src  = (current_player_ == Player::RED) ? p1_.last_selected () :
+                                                       p2_.last_selected ();
         auto dest = action;
 
         auto [valid, msg] = check_action_valid (src, dest);

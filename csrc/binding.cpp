@@ -113,7 +113,7 @@ PYBIND11_MODULE (stratego_cpp, m) {
         py::array_t<int8_t> board_array ({ height, width }, board.data ());
         info["cur_board"] = board_array;
 
-        py::array_t<size_t> board_shape_array (2);
+        py::array_t<int> board_shape_array (2);
         auto board_shape_buf = board_shape_array.mutable_unchecked<1> ();
         board_shape_buf (0)  = static_cast<int> (height);
         board_shape_buf (1)  = static_cast<int> (width);

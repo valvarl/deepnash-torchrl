@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from abc import ABC
 from collections.abc import Iterable
 from enum import Enum
 
@@ -47,11 +48,12 @@ LAKES_ORIGINAL = [((4, 2), (5, 3)), ((4, 6), (5, 7))]
 
 
 class GameMode(Enum):
-    ORIGINAL = 0
-    BARRAGE = 1
+    CUSTOM = 0
+    ORIGINAL = 1
+    BARRAGE = 2
 
 
-class StrategoConfig:
+class StrategoConfigBase(ABC):
     def __init__(
         self,
         height: int,
@@ -68,7 +70,52 @@ class StrategoConfig:
         moves_since_attack_limit: int | None = 200,
         observed_history_entries: int = 40,
         allow_competitive_deploy: bool = False,
-        game_mode: GameMode | None = None,
+        game_mode: GameMode = GameMode.CUSTOM,
+    ):
+        pass
+
+    @classmethod
+    def from_game_mode(cls, game_mode: GameMode) -> StrategoConfigBase:
+        if game_mode == GameMode.ORIGINAL:
+            return cls(
+                height=10,
+                width=10,
+                p1_pieces=PIECES_NUM_ORIGINAL,
+                p1_places_to_deploy=PLACES_TO_DEPLOY_RED_ORIGINAL,
+                p2_places_to_deploy=PLACES_TO_DEPLOY_BLUE_ORIGINAL,
+                lakes=LAKES_ORIGINAL,
+            )
+        elif game_mode == GameMode.BARRAGE:
+            return cls(
+                height=10,
+                width=10,
+                p1_pieces=PIECES_NUM_ORIGINAL,
+                p1_places_to_deploy=PLACES_TO_DEPLOY_RED_ORIGINAL,
+                p2_places_to_deploy=PLACES_TO_DEPLOY_BLUE_ORIGINAL,
+                lakes=LAKES_ORIGINAL,
+            )
+        else:
+            raise ValueError(f"Unknown game mode: {game_mode}")
+
+
+class StrategoConfig(StrategoConfigBase):
+    def __init__(
+        self,
+        height: int,
+        width: int,
+        p1_pieces: dict[Piece, int],
+        p2_pieces: dict[Piece, int] | None = None,
+        lakes: Iterable[tuple[Pos, Pos]] | None = None,
+        p1_places_to_deploy: Iterable[tuple[Pos, Pos]] | None = None,
+        p2_places_to_deploy: Iterable[tuple[Pos, Pos]] | None = None,
+        lakes_mask: np.ndarray | None = None,
+        p1_deploy_mask: np.ndarray | None = None,
+        p2_deploy_mask: np.ndarray | None = None,
+        total_moves_limit: int = 2000,
+        moves_since_attack_limit: int | None = 200,
+        observed_history_entries: int = 40,
+        allow_competitive_deploy: bool = False,
+        game_mode: GameMode = GameMode.CUSTOM,
     ):
         self.height = height
         self.width = width
@@ -194,26 +241,3 @@ class StrategoConfig:
             return False, "Observed history entries cannot be negative."
 
         return True, "Validation successful."
-
-    @classmethod
-    def from_game_mode(cls, game_mode: GameMode):
-        if game_mode == GameMode.ORIGINAL:
-            return cls(
-                height=10,
-                width=10,
-                p1_pieces=PIECES_NUM_ORIGINAL,
-                p1_places_to_deploy=PLACES_TO_DEPLOY_RED_ORIGINAL,
-                p2_places_to_deploy=PLACES_TO_DEPLOY_BLUE_ORIGINAL,
-                lakes=LAKES_ORIGINAL,
-            )
-        elif game_mode == GameMode.BARRAGE:
-            return cls(
-                height=10,
-                width=10,
-                p1_pieces=PIECES_NUM_ORIGINAL,
-                p1_places_to_deploy=PLACES_TO_DEPLOY_RED_ORIGINAL,
-                p2_places_to_deploy=PLACES_TO_DEPLOY_BLUE_ORIGINAL,
-                lakes=LAKES_ORIGINAL,
-            )
-        else:
-            raise ValueError(f"Unknown game mode: {game_mode}")

@@ -26,7 +26,7 @@ enum class Piece : int8_t {
     MARSHAL    = 13
 };
 
-inline bool operator< (Piece lhs, Piece rhs) {
+inline bool operator<(Piece lhs, Piece rhs) {
     return static_cast<int8_t> (lhs) < static_cast<int8_t> (rhs);
 }
 
@@ -34,7 +34,7 @@ enum class Player : int8_t { RED = 1, BLUE = -1 };
 
 using Pos = std::array<int8_t, 2>;
 
-enum class GameMode { ORIGINAL, BARRAGE };
+enum class GameMode { CUSTOM, ORIGINAL, BARRAGE };
 
 enum class GamePhase { TERMINAL, DEPLOY, SELECT, MOVE };
 

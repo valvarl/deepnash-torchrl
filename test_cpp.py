@@ -14,12 +14,12 @@ init_from_mask = True
 
 if not init_from_mask:
     # Define lake position (center 2x2 area)
-    lakes = [[[1, 3], [1, 3]]]
+    lakes = [((1, 3), (1, 3))]
 
     # Define deployment areas (top and bottom rows)
-    p1_deploy = [([3, 0], [3, 3])]
+    p1_deploy = [((3, 0), (3, 3))]
 
-    p2_deploy = [([0, 0], [0, 3])]
+    p2_deploy = [((0, 0), (0, 3))]
     # Create config
     config = sp.StrategoConfig(
         height=4,
