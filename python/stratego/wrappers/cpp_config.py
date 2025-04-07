@@ -38,7 +38,6 @@ class StrategoConfigCpp(StrategoConfigBase):
             "height": height,
             "width": width,
             "p1_pieces": p1_pieces_cpp,
-            "p2_pieces": p2_pieces_cpp,
             "total_moves_limit": total_moves_limit,
             "moves_since_attack_limit": moves_since_attack_limit,
             "observed_history_entries": observed_history_entries,
@@ -46,6 +45,8 @@ class StrategoConfigCpp(StrategoConfigBase):
             "game_mode": game_mode_cpp,
         }
 
+        if p2_pieces_cpp is not None:
+            args["p2_pieces"] = p2_pieces_cpp
         if lakes is not None:
             args["lakes"] = lakes
         if p1_places_to_deploy is not None:

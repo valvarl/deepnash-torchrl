@@ -39,6 +39,7 @@ PYBIND11_MODULE (stratego_cpp, m) {
 
     // StrategoConfig binding (simplified)
     py::enum_<GameMode> (m, "GameMode")
+    .value ("CUSTOM", GameMode::CUSTOM)
     .value ("ORIGINAL", GameMode::ORIGINAL)
     .value ("BARRAGE", GameMode::BARRAGE)
     .export_values ();
@@ -69,11 +70,52 @@ PYBIND11_MODULE (stratego_cpp, m) {
     .def_property_readonly ("allowed_pieces", &StrategoConfig::allowed_pieces)
     .def_property_readonly ("game_mode", &StrategoConfig::game_mode);
 
+    py::class_<MaskedMultiDiscrete> (m, "MaskedMultiDiscrete")
+    .def (py::init<const std::vector<int>&, uint32_t> (), py::arg ("nvec"),
+    py::arg ("seed") = 0)
+    .def ("set_mask", &MaskedMultiDiscrete::set_mask, py::arg ("mask"),
+    "Set the binary mask indicating which actions are allowed")
+    .def ("sample", &MaskedMultiDiscrete::sample, "Sample a valid action respecting the current mask")
+    .def_property_readonly (
+    "nvec", [] (const MaskedMultiDiscrete& self) { return self.nvec (); }, "Return the dimension sizes")
+    .def_property_readonly ("mask", [] (const MaskedMultiDiscrete& self) {
+        auto& mask    = self.mask ();
+        auto& nvec    = self.nvec ();
+        size_t height = nvec[0], width = nvec[1];
+        py::array_t<bool> mask_array ({ height, width });
+        auto buf = mask_array.mutable_unchecked<2> ();
+        for (size_t i = 0; i < height; ++i) {
+            for (size_t j = 0; j < width; ++j) {
+                buf (i, j) = mask[i * width + j];
+            }
+        }
+        return mask_array;
+    });
+
     // Main environment class
     py::class_<StrategoEnv, std::shared_ptr<StrategoEnv>> (m, "StrategoEnv")
     .def (py::init<std::shared_ptr<StrategoConfig>, uint32_t> (),
     py::arg ("config") = nullptr, py::arg ("seed") = 0)
-    .def ("reset", &StrategoEnv::reset, py::arg ("seed") = 0)
+    .def ("reset",
+    [] (StrategoEnv& env, int seed = 0) {
+        auto [obs, action_mask] = env.reset (static_cast<int32_t> (seed));
+
+        // Convert observation to numpy array
+        size_t height = env.height (), width = env.width ();
+        py::array_t<double> obs_array (
+        { obs.size () / height / width, height, width }, obs.data ());
+
+        // Convert action mask to numpy array
+        py::array_t<bool> action_mask_array ({ height, width });
+        auto buf = action_mask_array.mutable_unchecked<2> ();
+        for (size_t i = 0; i < height; ++i) {
+            for (size_t j = 0; j < width; ++j) {
+                buf (i, j) = action_mask[i * width + j];
+            }
+        }
+
+        return py::make_tuple (obs_array, action_mask_array);
+    })
     .def ("step",
     [] (StrategoEnv& env, const Pos& action) {
         auto [obs, action_mask, reward, terminated, truncated] = env.step (action);
@@ -158,6 +200,11 @@ PYBIND11_MODULE (stratego_cpp, m) {
         }
 
         return info;
+    })
+    .def_property_readonly ("action_space",
+    [] (StrategoEnv& env) {
+        auto& action_space = env.action_space ();
+        return action_space;
     })
     .def_property_readonly ("board",
     [] (StrategoEnv& env) {

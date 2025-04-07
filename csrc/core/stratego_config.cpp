@@ -185,6 +185,7 @@ GameMode game_mode)
             allowed_pieces_.push_back (static_cast<int> (piece));
         }
     }
+    std::reverse (allowed_pieces_.begin (), allowed_pieces_.end ());
 
     auto [valid, msg] = validate ();
     if (!valid) {

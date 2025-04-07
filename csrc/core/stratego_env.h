@@ -51,7 +51,7 @@ class StrategoEnv {
     public:
     StrategoEnv (std::shared_ptr<StrategoConfig> config = nullptr, uint32_t seed = 0);
 
-    void reset (uint32_t seed = 0);
+    std::tuple<std::vector<double>, std::vector<bool>> reset (uint32_t seed = 0);
     std::tuple<std::vector<double>, std::vector<bool>, int, bool, bool> step (
     const Pos& action);
 
@@ -92,6 +92,10 @@ class StrategoEnv {
         return moves_since_attack_;
     }
     const Pos& last_selected (Player player) const;
+
+    const MaskedMultiDiscrete& action_space () const {
+        return action_space_;
+    }
 
     private:
     // Observation and state generation

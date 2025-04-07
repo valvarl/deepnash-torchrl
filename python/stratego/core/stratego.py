@@ -12,10 +12,10 @@ from stratego.core.stratego_base import StrategoEnvBase
 
 
 class GamePhase(Enum):
-    TERMINAL = auto()
-    DEPLOY = auto()
-    SELECT = auto()
-    MOVE = auto()
+    TERMINAL = 0
+    DEPLOY = 1
+    SELECT = 2
+    MOVE = 3
 
 
 def get_random_choice(valid_items):

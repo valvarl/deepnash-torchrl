@@ -64,15 +64,31 @@ class StrategoEnvCpp(StrategoEnvBase):
             self.width = self._config.width
             self.action_space = self._get_action_space()
 
-        obs = self._env_cpp.reset(seed=seed)
-        return obs
+        (
+            obs,
+            action_mask,
+        ) = self._env_cpp.reset(seed)
+        return (
+            {"obs": obs, "action_mask": action_mask},
+            None,
+        )
 
     def step(self, action):
-        obs = self._env_cpp.step(action)
-        return obs
+        obs, action_mask, reward, terminated, truncated = self._env_cpp.step(action)
+        return (
+            {"obs": obs, "action_mask": action_mask},
+            reward,
+            terminated,
+            truncated,
+            None,
+        )
 
     def get_info(self) -> dict[str : tp.Any]:
         return self._env_cpp.get_info()
+
+    @property
+    def config(self):
+        return self._config
 
     @property
     def height(self) -> int:
@@ -84,11 +100,11 @@ class StrategoEnvCpp(StrategoEnvBase):
 
     @property
     def game_phase(self) -> GamePhase:
-        return self._env_cpp.game_phase
+        return GamePhase(self._env_cpp.game_phase.value)
 
     @property
-    def current_player(self) -> Player:
-        return self._env_cpp.current_player
+    def player(self) -> Player:
+        return Player(self._env_cpp.current_player.value)
 
     @property
     def board(self) -> np.ndarray:

@@ -35,7 +35,7 @@ StrategoEnv::StrategoEnv (std::shared_ptr<StrategoConfig> config, uint32_t seed)
     { static_cast<int> (height_), static_cast<int> (width_) }, seed);
 }
 
-void StrategoEnv::reset (uint32_t seed) {
+std::tuple<std::vector<double>, std::vector<bool>> StrategoEnv::reset (uint32_t seed) {
     if (height_ != config_->height () || width_ != config_->width ()) {
         height_       = config_->height ();
         width_        = config_->width ();
@@ -85,6 +85,11 @@ void StrategoEnv::reset (uint32_t seed) {
     // Сброс счётчиков
     two_square_detector_.reset ();
     chasing_detector_.reset ();
+
+    std::vector<double> obs;
+    std::vector<bool> action_mask;
+    generate_env_state (obs, action_mask);
+    return { std::move (obs), std::move (action_mask) };
 }
 
 void StrategoEnv::generate_observation (std::vector<double>& obs) const {
@@ -163,6 +168,7 @@ void StrategoEnv::generate_env_state (std::vector<double>& obs, std::vector<bool
         valid_destinations (action_mask);
     }
     action_space_.set_mask (action_mask);
+    std::cout << "action_mask: " << action_space_.mask () << "\n";
 }
 
 void StrategoEnv::get_public_obs (const std::array<std::vector<bool>, 3>& public_obs_info,
