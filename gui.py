@@ -2,10 +2,11 @@ import pygame
 import gymnasium as gym
 import time
 import numpy as np
-from deepnash.stratego_gym.envs.primitives import Piece, Player
-from deepnash.stratego_gym.envs.startego import WINDOW_SIZE, GamePhase
+from stratego.core.primitives import Piece, Player
+from stratego.core.stratego import WINDOW_SIZE, GamePhase
 
 from tests.conftest import env_5x5
+
 
 def play_with_mouse():
     # env = gym.make("stratego_gym/Stratego-v0", render_mode="human")
@@ -25,10 +26,18 @@ def play_with_mouse():
                 running = False
             elif event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
                 mouse_x, mouse_y = event.pos
-                cell_size = (WINDOW_SIZE // env.board.shape[0], WINDOW_SIZE // env.board.shape[1])
+                cell_size = (
+                    WINDOW_SIZE // env.board.shape[0],
+                    WINDOW_SIZE // env.board.shape[1],
+                )
                 row = mouse_y // cell_size[1]
                 col = mouse_x // cell_size[0]
-                if env.game_phase == GamePhase.DEPLOY and count % 2 != 0 or env.game_phase != GamePhase.DEPLOY and (count // 2) % 2 != 0:
+                if (
+                    env.game_phase == GamePhase.DEPLOY
+                    and count % 2 != 0
+                    or env.game_phase != GamePhase.DEPLOY
+                    and (count // 2) % 2 != 0
+                ):
                     row = env.board.shape[0] - row - 1
                     col = env.board.shape[1] - col - 1
                 print(row, col)
@@ -36,13 +45,16 @@ def play_with_mouse():
 
                 state, reward, terminated, truncated, info = env.step((row, col))
                 if terminated:
-                    print(f"Game over! Player {-1 * info['cur_player']} received {reward}")
+                    print(
+                        f"Game over! Player {-1 * info['cur_player']} received {reward}"
+                    )
                     env.reset()
 
         env.render()
         time.sleep(0.1)
-    
+
     pygame.quit()
+
 
 if __name__ == "__main__":
     play_with_mouse()

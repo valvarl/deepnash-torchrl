@@ -3,7 +3,7 @@ import numpy as np
 import pytest
 
 from stratego.core.primitives import Player
-from stratego.core.startego import StrategoEnv, GamePhase
+from stratego.core.stratego import StrategoEnv, GamePhase
 
 
 def test_single_trajectory_rollout(env_original: StrategoEnv):

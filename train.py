@@ -11,7 +11,7 @@ from deepnash.learn.rnad import RNaDSolver
 from deepnash.learn.config import RNaDConfig
 from stratego.core.config import StrategoConfig
 from stratego.core.primitives import Piece
-from stratego.core.startego import (
+from stratego.core.stratego import (
     GamePhase,
 )  # must be importable on the driver side too
 

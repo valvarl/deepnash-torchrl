@@ -14,7 +14,7 @@ from stratego.core.config import (
     LAKES_ORIGINAL,
 )
 from stratego.core.primitives import Piece
-from stratego.core.startego import StrategoEnv
+from stratego.core.stratego import StrategoEnv
 
 
 @pytest.fixture()
