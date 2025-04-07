@@ -15,31 +15,38 @@ class CMakeExtension(Extension):
 
 class CMakeBuild(build_ext):
     def build_extension(self, ext):
-        # 📍 Имя модуля (например, stratego.cpp.stratego_cpp)
-        ext_name = ext.name  # stratego.cpp.stratego_cpp
-        ext_path = Path(
-            self.get_ext_fullpath(ext_name)
-        )  # полный путь, где setuptools ожидает .so
+        ext_name = ext.name
+        ext_path = Path(self.get_ext_fullpath(ext_name))
 
-        cfg = "Release"
+        build_type = os.getenv("CMAKE_BUILD_TYPE", "Release")
+
         build_temp = Path(self.build_temp) / ext.name
         build_temp.mkdir(parents=True, exist_ok=True)
 
-        # 📍 Папка, куда должен попасть .so (где его будет искать Python)
         extdir = ext_path.parent.resolve()
 
         cmake_args = [
-            f"-DCMAKE_LIBRARY_OUTPUT_DIRECTORY={extdir}",  # путь, куда CMake положит .so
+            f"-DCMAKE_LIBRARY_OUTPUT_DIRECTORY={extdir}",
             f"-DPYTHON_EXECUTABLE={sys.executable}",
-            f"-DCMAKE_BUILD_TYPE={cfg}",
+            f"-DCMAKE_BUILD_TYPE={build_type}",
         ]
 
         if platform.system() != "Windows":
             cmake_args += ["-DCMAKE_POSITION_INDEPENDENT_CODE=ON"]
 
-        subprocess.check_call(["cmake", ext.sourcedir] + cmake_args, cwd=build_temp)
+        env = os.environ.copy()
+        if build_type == "Debug":
+            env["ASAN_OPTIONS"] = "detect_leaks=1:halt_on_error=1"
+        else:
+            env = None
+
         subprocess.check_call(
-            ["cmake", "--build", ".", "--target", "stratego_cpp"], cwd=build_temp
+            ["cmake", ext.sourcedir] + cmake_args, cwd=build_temp, env=env
+        )
+        subprocess.check_call(
+            ["cmake", "--build", ".", "--target", "stratego_cpp"],
+            cwd=build_temp,
+            env=env,
         )
 
 
@@ -48,9 +55,7 @@ setup(
     version="0.1.0",
     author="Varlachev Valery",
     description="Stratego environment with C++ backend and Python training pipeline",
-    ext_modules=[
-        CMakeExtension("stratego.cpp.stratego_cpp")
-    ],  # 💡 это Python-импорт-путь
+    ext_modules=[CMakeExtension("stratego.cpp.stratego_cpp")],
     cmdclass={"build_ext": CMakeBuild},
     packages=find_packages("python"),
     package_dir={"": "python"},
