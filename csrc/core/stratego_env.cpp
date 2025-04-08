@@ -536,7 +536,11 @@ StrategoEnv::check_action_valid (const Pos& src, const Pos& dest) const {
     int8_t src_piece_val  = board_[src[0] * width_ + src[1]];
     int8_t dest_piece_val = board_[dest[0] * width_ + dest[1]];
 
-    // std::cout << static_cast<int>(src_piece_val) << " " << static_cast<int>(dest_piece_val);
+    std::cout << static_cast<int> (src_piece_val) << " "
+              << static_cast<int> (dest_piece_val);
+    std::cout << "SRC DEST: " << static_cast<int> (src[0]) << " "
+              << static_cast<int> (src[1]) << " " << static_cast<int> (dest[0])
+              << " " << static_cast<int> (dest[1]) << "\n";
 
     if (src_piece_val < static_cast<int8_t> (Piece::SPY)) {
         return { false, "Selected piece cannot be moved by player" };
@@ -556,7 +560,7 @@ StrategoEnv::check_action_valid (const Pos& src, const Pos& dest) const {
             return { false, "Invalid move" };
         }
     } else {
-        if (src[0] != dest[0] || src[1] != dest[1]) {
+        if (src[0] != dest[0] && src[1] != dest[1]) {
             return { false, "Scouts can only move in straight lines" };
         }
         if (src[0] == dest[0]) {
@@ -841,12 +845,13 @@ void StrategoEnv::valid_destinations (std::vector<bool>& action_mask) const {
     if (selected_piece_val == static_cast<int8_t> (Piece::SCOUT)) {
         // Scout can move multiple squares in one direction
         for (const auto& dir : directions) {
-            Pos current_pos         = selected;
-            int encountered_enemies = 0;
+            Pos current_pos       = selected;
+            int encountered_enemy = 0;
 
             while (true) {
-                current_pos = { static_cast<int8_t> (current_pos[0] + dir.first),
-                    static_cast<int8_t> (current_pos[1] + dir.second) };
+                // Update position
+                current_pos[0] += static_cast<int8_t> (dir.first);
+                current_pos[1] += static_cast<int8_t> (dir.second);
 
                 // Check boundaries
                 if (current_pos[0] < 0 || current_pos[0] >= height_ ||
@@ -854,27 +859,23 @@ void StrategoEnv::valid_destinations (std::vector<bool>& action_mask) const {
                     break;
                 }
 
-                // Check lake or piece
+                // Check piece
                 int8_t target_val = board_[current_pos[0] * width_ + current_pos[1]];
 
-                if (target_val == static_cast<int8_t> (Piece::LAKE)) {
-                    break;
-                }
-
-                if (target_val < 0) { // Enemy piece
-                    if (target_val == -static_cast<int8_t> (Piece::LAKE) ||
-                    ++encountered_enemies > 1) {
+                if (target_val != static_cast<int8_t> (Piece::EMPTY)) {
+                    if (target_val > -static_cast<int8_t> (Piece::FLAG)) {
                         break;
                     }
+                    encountered_enemy++;
+                }
+
+                // Stop if encountered more than 1 enemy
+                if (encountered_enemy > 1) {
+                    break;
                 }
 
                 // Mark as valid destination
                 action_mask[current_pos[0] * width_ + current_pos[1]] = true;
-
-                // Non-scout pieces would stop after first move
-                if (selected_piece_val != static_cast<int8_t> (Piece::SCOUT)) {
-                    break;
-                }
             }
         }
     } else {

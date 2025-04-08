@@ -26,13 +26,13 @@ def test_single_trajectory_rollout(
 
         state, reward, terminated, truncated, info = env.step(action)
 
-    # assert env.game_phase == GamePhase.SELECT
-    # assert env.player == Player.RED
-    # while not terminated:
-    #     action = env.action_space.sample()
-    #     state, reward, terminated, truncated, info = env.step(action)
+    assert env.game_phase == GamePhase.SELECT
+    assert env.player == Player.RED
+    while not terminated:
+        action = env.action_space.sample()
+        state, reward, terminated, truncated, info = env.step(action)
 
-    # assert env.game_phase == GamePhase.TERMINAL
+    assert env.game_phase == GamePhase.TERMINAL
 
 
 @pytest.mark.parametrize(
@@ -74,8 +74,18 @@ def test_lose_on_deploy(
         assert (reward == 0) if blue_surrounded else (reward == 1)
     elif blue_surrounded:
         assert env.game_phase == GamePhase.SELECT
-        state, reward, terminated, truncated, info = env.step(env.action_space.sample())
-        state, reward, terminated, truncated, info = env.step(env.action_space.sample())
+        action = env.action_space.sample()
+        print(env.action_space.mask, action)
+        print(env.action_space.sample())
+        print(env.action_space.sample())
+        print(env.action_space.sample())
+        state, reward, terminated, truncated, info = env.step(action)
+        action = env.action_space.sample()
+        print(env.action_space.mask, action)
+        print(env.action_space.sample())
+        print(env.action_space.sample())
+        print(env.action_space.sample())
+        state, reward, terminated, truncated, info = env.step(action)
         assert env.game_phase == GamePhase.TERMINAL
         assert reward == 1
     else:
