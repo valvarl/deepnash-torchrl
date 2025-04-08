@@ -10,6 +10,7 @@ from stratego.core.stratego import GamePhase, StrategoEnvBase
 from stratego.wrappers.cpp_config import StrategoConfigCpp
 
 from stratego.cpp import stratego_cpp as sp
+from stratego.wrappers.cpp_masked_multi_descrete import MaskedMultiDiscreteCpp
 
 
 class StrategoEnvCpp(StrategoEnvBase):
@@ -53,7 +54,7 @@ class StrategoEnvCpp(StrategoEnvBase):
 
     def reset(self, seed=None, options=None):
         if seed is None:
-            seed = 35
+            seed = 0
 
         super().reset(seed=seed, options=options)
 
@@ -72,7 +73,7 @@ class StrategoEnvCpp(StrategoEnvBase):
         ) = self._env_cpp.reset(seed)
         return (
             {"obs": obs, "action_mask": action_mask},
-            None,
+            self.get_info(),
         )
 
     def step(self, action):
@@ -82,7 +83,7 @@ class StrategoEnvCpp(StrategoEnvBase):
             reward,
             terminated,
             truncated,
-            None,
+            self.get_info(),
         )
 
     def get_info(self) -> dict[str : tp.Any]:
@@ -118,4 +119,4 @@ class StrategoEnvCpp(StrategoEnvBase):
 
     @property
     def action_space(self):
-        return self._env_cpp.action_space
+        return MaskedMultiDiscreteCpp(self._env_cpp.action_space)

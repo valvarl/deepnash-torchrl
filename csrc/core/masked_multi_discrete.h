@@ -32,6 +32,10 @@ class MaskedMultiDiscrete {
     const std::vector<bool>& mask () const {
         return mask_;
     }
+
+    void update_rng_state () {
+        rng_.discard (1);
+    }
 };
 
 #endif // MASKED_MULTI_DISCRETE_H

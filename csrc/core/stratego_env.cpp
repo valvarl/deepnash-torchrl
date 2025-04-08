@@ -508,6 +508,8 @@ StrategoEnv::step (const Pos& action) {
         throw std::runtime_error ("Game has already terminated");
     }
 
+    action_space_.update_rng_state ();
+
     generate_env_state (obs, action_mask);
     return { std::move (obs), std::move (action_mask), reward, terminated, truncated };
 }

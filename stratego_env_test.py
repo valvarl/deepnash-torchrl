@@ -22,7 +22,7 @@ from stratego.core.primitives import Piece, Player
 def basic_test():
     import stratego
 
-    env = gym.make("stratego_gym/Stratego-v0", render_mode="human")
+    env = gym.make("stratego_gym/StrategoCpp-v0", render_mode="human")
     env.reset()
 
     start_time = time.time()
@@ -157,6 +157,6 @@ def vectorized_test(n_procs, n_workers):
 
 if __name__ == "__main__":
     # vectorized_test(4, 4)
-    policy_test()
-    # basic_test()
+    # policy_test()
+    basic_test()
     # rollout_test()
