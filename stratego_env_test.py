@@ -82,7 +82,7 @@ def policy_test():
 
     reader = default_info_dict_reader(["cur_player"])
     env = (
-        GymEnv("stratego_gym/Stratego-v0", render_mode=None)
+        GymEnv("stratego_gym/StrategoCpp-v0", render_mode=None)
         .set_info_dict_reader(reader)
         .to(device)
     )
@@ -119,19 +119,20 @@ def rollout_test():
     start_time = time.time()
     count = 0
     while time.time() - start_time < 60:
-        tensordict_rollout = env.rollout(max_steps=2000, policy=agent)
+        tensordict_rollout = env.rollout(max_steps=3600, policy=agent)
         count += tensordict_rollout.batch_size[0]
         tensordict_rollout = tensordict_rollout[-1]["next"]
         if tensordict_rollout["terminated"]:
+            info = env.get_info()
             print(
-                f"Game over! Player {-1 * tensordict_rollout['cur_player']} received {tensordict_rollout['reward']}"
+                f"Game over! Player {-1 * tensordict_rollout['cur_player']} received {tensordict_rollout['reward']}, turn: {info['total_moves']}, turn: {info['moves_since_attack']}"
             )
     print(count)
 
 
 def make_env():
     reader = default_info_dict_reader(["cur_player"])
-    return GymEnv("stratego_gym/Stratego-v0").set_info_dict_reader(reader)
+    return GymEnv("stratego_gym/StrategoCpp-v0").set_info_dict_reader(reader)
 
 
 def vectorized_test(n_procs, n_workers):
@@ -166,7 +167,7 @@ def vectorized_test(n_procs, n_workers):
 
 
 if __name__ == "__main__":
-    # vectorized_test(4, 4)
+    # vectorized_test(4, 8)
     policy_test()
     # basic_test()
     # rollout_test()

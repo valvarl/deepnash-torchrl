@@ -141,11 +141,10 @@ PYBIND11_MODULE (stratego_cpp, m) {
     [] (StrategoEnv& env) {
         py::dict info;
 
-        py::array_t<int> cur_player_array (1);
-        auto cur_player_buf   = cur_player_array.mutable_unchecked<1> ();
+        py::object np_int32 = py::module::import ("numpy").attr ("int32");
+
         Player current_player = env.current_player ();
-        cur_player_buf (0)    = static_cast<int> (current_player);
-        info["cur_player"]    = cur_player_array;
+        info["cur_player"]    = np_int32 (static_cast<int> (current_player));
 
         size_t height = env.height (), width = env.width ();
         std::vector<int8_t> board = env.board ();
@@ -182,22 +181,22 @@ PYBIND11_MODULE (stratego_cpp, m) {
         moves_since_attack_buf (0) = env.moves_since_attack ();
         info["moves_since_attack"] = moves_since_attack_array;
 
-        py::array_t<int> game_phase_array (1);
-        auto game_phase_buf  = game_phase_array.mutable_unchecked<1> ();
+        // py::array_t<int> game_phase_array (1);
+        // auto game_phase_buf  = game_phase_array.mutable_unchecked<1> ();
         GamePhase game_phase = env.game_phase ();
-        game_phase_buf (0)   = static_cast<int> (game_phase);
-        info["game_phase"]   = game_phase_array;
+        // game_phase_buf (0)   = static_cast<int> (game_phase);
+        info["game_phase"] = np_int32 (static_cast<int> (game_phase));
 
-        if (game_phase != GamePhase::MOVE) {
-            info["last_selected"] = py::none ();
-        } else {
-            py::array_t<size_t> last_selected_array (2);
-            auto last_selected_buf = last_selected_array.mutable_unchecked<1> ();
-            Pos last_selected      = env.last_selected (current_player);
-            last_selected_buf (0)  = static_cast<int> (last_selected[0]);
-            last_selected_buf (1)  = static_cast<int> (last_selected[1]);
-            info["last_selected"]  = last_selected_array;
-        }
+        // if (game_phase != GamePhase::MOVE) {
+        //     info["last_selected"] = py::none ();
+        // } else {
+        //     py::array_t<size_t> last_selected_array (2);
+        //     auto last_selected_buf = last_selected_array.mutable_unchecked<1>
+        //     (); Pos last_selected      = env.last_selected (current_player);
+        //     last_selected_buf (0)  = static_cast<int> (last_selected[0]);
+        //     last_selected_buf (1)  = static_cast<int> (last_selected[1]);
+        //     info["last_selected"]  = last_selected_array;
+        // }
 
         return info;
     })
