@@ -632,9 +632,10 @@ bool is_other_player) const {
     (height_ + 2) * (width_ + 2), static_cast<int8_t> (Piece::LAKE));
     for (size_t i = 0; i < height_; ++i) {
         for (size_t j = 0; j < width_; ++j) {
-            padded_board[(i + 1) * width_ + j + 1] = board_view[i * width_ + j];
-            if (padded_board[(i + 1) * width_ + j + 1] == -static_cast<int8_t> (Piece::LAKE)) {
-                padded_board[(i + 1) * width_ + j + 1] =
+            padded_board[(i + 1) * (width_ + 2) + j + 1] = board_view[i * width_ + j];
+            if (padded_board[(i + 1) * (width_ + 2) + j + 1] ==
+            -static_cast<int8_t> (Piece::LAKE)) {
+                padded_board[(i + 1) * (width_ + 2) + j + 1] =
                 static_cast<int8_t> (Piece::LAKE);
             }
         }
@@ -644,13 +645,13 @@ bool is_other_player) const {
     std::vector<bool> surrounded (height_ * width_, false);
     for (size_t i = 0; i < height_; ++i) {
         for (size_t j = 0; j < width_; ++j) {
-            bool left = padded_board[(i + 1) * width_ + j] >=
+            bool left = padded_board[(i + 1) * (width_ + 2) + j] >=
             static_cast<int8_t> (Piece::LAKE);
-            bool right = padded_board[(i + 1) * width_ + j + 2] >=
+            bool right = padded_board[(i + 1) * (width_ + 2) + j + 2] >=
             static_cast<int8_t> (Piece::LAKE);
-            bool up =
-            padded_board[i * width_ + j + 1] >= static_cast<int8_t> (Piece::LAKE);
-            bool down = padded_board[(i + 2) * width_ + j + 1] >=
+            bool up = padded_board[i * (width_ + 2) + j + 1] >=
+            static_cast<int8_t> (Piece::LAKE);
+            bool down = padded_board[(i + 2) * (width_ + 2) + j + 1] >=
             static_cast<int8_t> (Piece::LAKE);
 
             surrounded[i * width_ + j] = left && right && up && down;
