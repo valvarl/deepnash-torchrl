@@ -17,7 +17,12 @@ def test_single_trajectory_rollout(
         assert env.game_phase == GamePhase.DEPLOY
         assert env.player == Player.RED if i % 2 == 0 else Player.BLUE
         action = env.action_space.sample()
-        print(env.action_space.mask)
+        # print(env.action_space.sample())
+        # print(env.action_space.sample())
+        # print(env.action_space.sample())
+        # print(env.action_space.sample())
+
+        # print(env.action_space.mask, action)
 
         state, reward, terminated, truncated, info = env.step(action)
 

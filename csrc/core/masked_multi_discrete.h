@@ -3,6 +3,7 @@
 
 #include <algorithm>
 #include <random>
+#include <stdexcept>
 #include <vector>
 
 
@@ -13,17 +14,21 @@ class MaskedMultiDiscrete {
     std::mt19937 rng_;
 
     public:
-    // Объявление конструктора
+    // Constructor
     MaskedMultiDiscrete (const std::vector<int>& nvec, uint32_t seed = 0);
 
-    // Объявление методов
+    // Method to set the mask
     void set_mask (const std::vector<bool>& mask);
+
+    // Method to sample from the space
     std::vector<int> sample ();
 
+    // Getter for nvec
     const std::vector<int>& nvec () const {
         return nvec_;
     }
 
+    // Getter for mask
     const std::vector<bool>& mask () const {
         return mask_;
     }

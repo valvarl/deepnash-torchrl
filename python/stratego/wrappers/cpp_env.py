@@ -23,7 +23,7 @@ class StrategoEnvCpp(StrategoEnvBase):
         self._env_cpp = sp.StrategoEnv(self._config._config_cpp)
 
         self.observation_space = self._get_observation_space()
-        self.action_space: MaskedMultiDiscrete = self._get_action_space()
+        self.action_space: MaskedMultiDiscrete  # = self._get_action_space()
 
     def _get_observation_space(self):
         observation_channels = (
@@ -113,3 +113,7 @@ class StrategoEnvCpp(StrategoEnvBase):
     @property
     def lakes(self) -> np.ndarray:
         return self._env_cpp.lakes
+
+    @property
+    def action_space(self):
+        return self._env_cpp.action_space

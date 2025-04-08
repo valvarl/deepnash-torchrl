@@ -203,8 +203,19 @@ PYBIND11_MODULE (stratego_cpp, m) {
     })
     .def_property_readonly ("action_space",
     [] (StrategoEnv& env) {
-        auto& action_space = env.action_space ();
-        return action_space;
+        // auto& action_space = env.action_space ();
+        // auto& mask         = action_space.mask ();
+        // auto& nvec         = action_space.nvec ();
+        // size_t height = nvec[0], width = nvec[1];
+        // py::array_t<bool> mask_array ({ height, width });
+        // auto buf = mask_array.mutable_unchecked<2> ();
+        // for (size_t i = 0; i < height; ++i) {
+        //     for (size_t j = 0; j < width; ++j) {
+        //         buf (i, j) = mask[i * width + j];
+        //     }
+        // }
+        // return py::make_tuple (mask_array, height, width);
+        return env.action_space ();
     })
     .def_property_readonly ("board",
     [] (StrategoEnv& env) {

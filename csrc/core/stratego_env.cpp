@@ -261,19 +261,19 @@ StrategoEnv::step (const Pos& action) {
 
         auto& curr_player = (current_player_ == Player::RED) ? p1_ : p2_;
         auto& opp_player  = (current_player_ == Player::RED) ? p2_ : p1_;
-        size_t deploy_idx = 0, deploy_piece = 0;
-        for (auto piece : allowed_pieces_) {
-            int i = 0;
-            for (; i < curr_player.unrevealed_[piece]; ++i) {
-                if (deploy_idx == curr_player.deploy_idx_) {
-                    deploy_piece = piece;
-                    break;
-                }
-            }
-            if (deploy_piece != 0) {
+
+        size_t cumulative_count = 0;
+        size_t deploy_piece     = 0;
+
+        for (size_t i = 0; i < allowed_pieces_.size (); ++i) {
+            size_t piece = allowed_pieces_[i];
+            size_t count = curr_player.unrevealed_[piece];
+
+            if (curr_player.deploy_idx_ < cumulative_count + count) {
+                deploy_piece = piece;
                 break;
             }
-            deploy_idx += i;
+            cumulative_count += count;
         }
 
         board_[action[0] * width_ + action[1]] = deploy_piece;
@@ -357,8 +357,8 @@ StrategoEnv::step (const Pos& action) {
         break;
     }
     case GamePhase::MOVE: {
-        auto src  = (current_player_ == Player::RED) ? p1_.last_selected () :
-                                                       p2_.last_selected ();
+        auto src = (current_player_ == Player::RED) ? p1_.last_selected () :
+                                                      p2_.last_selected ();
         auto dest = action;
 
         auto [valid, msg] = check_action_valid (src, dest);
