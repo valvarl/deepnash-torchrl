@@ -52,8 +52,7 @@ class StrategoEnv {
     StrategoEnv (std::shared_ptr<StrategoConfig> config = nullptr, uint32_t seed = 0);
 
     std::tuple<std::vector<double>, std::vector<bool>> reset (uint32_t seed = 0);
-    std::tuple<std::vector<double>, std::vector<bool>, int, bool, bool> step (
-    const Pos& action);
+    std::tuple<std::vector<double>, std::vector<bool>, int, bool, bool> step (Pos action);
 
     Pos get_random_action () const;
 

@@ -82,7 +82,7 @@ def policy_test():
 
     reader = default_info_dict_reader(["cur_player"])
     env = (
-        GymEnv("stratego_gym/StrategoCpp-v0", render_mode=None)
+        GymEnv("stratego_gym/Stratego-v0", render_mode=None)
         .set_info_dict_reader(reader)
         .to(device)
     )
@@ -97,8 +97,9 @@ def policy_test():
         # time.sleep(0.1)
         count += 1
         if tensordict["terminated"]:
+            info = env.get_info()
             print(
-                f"Game over! Player {-1 * tensordict['cur_player']} received {tensordict['reward']}"
+                f"Game over! Player {-1 * tensordict['cur_player']} received {tensordict['reward']}, turn: {info['total_moves']}, turn: {info['moves_since_attack']}"
             )
             tensordict = env.reset()
     print(count)
@@ -110,7 +111,7 @@ def rollout_test():
 
     reader = default_info_dict_reader(["cur_player"])
     env = (
-        GymEnv("stratego_gym/Stratego-v0", render_mode=None)
+        GymEnv("stratego_gym/StrategoCpp-v0", render_mode=None)
         .set_info_dict_reader(reader)
         .to(device)
     )

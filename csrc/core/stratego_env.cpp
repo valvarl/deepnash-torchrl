@@ -140,14 +140,11 @@ void StrategoEnv::generate_observation (std::vector<double>& obs) const {
     double since_attack_ratio =
     static_cast<double> (moves_since_attack_) / moves_since_attack_limit_;
 
-    for (size_t i = 0; i < height_; ++i) {
-        for (size_t j = 0; j < width_; ++j) {
-            obs.push_back (total_moves_ratio);
-            obs.push_back (since_attack_ratio);
-            obs.push_back (game_phase_ == GamePhase::DEPLOY ? 1.0 : 0.0);
-            obs.push_back (game_phase_ == GamePhase::MOVE ? 1.0 : 0.0);
-        }
-    }
+    obs.insert (obs.end (), height_ * width_, total_moves_ratio);
+    obs.insert (obs.end (), height_ * width_, since_attack_ratio);
+    obs.insert (obs.end (), height_ * width_,
+    (game_phase_ == GamePhase::DEPLOY ? 1.0 : 0.0));
+    obs.insert (obs.end (), height_ * width_, (game_phase_ == GamePhase::MOVE ? 1.0 : 0.0));
 
     // 5. last_selected
     const Pos& last_selected = player_state (current_player_).last_selected ();
@@ -237,7 +234,7 @@ void StrategoEnv::encode_move (const Pos& src, const Pos& dest, std::vector<doub
 }
 
 std::tuple<std::vector<double>, std::vector<bool>, int, bool, bool>
-StrategoEnv::step (const Pos& action) {
+StrategoEnv::step (Pos action) {
     std::pair<bool, std::string> action_valid = validate_coord (action);
     if (!action_valid.first) {
         throw std::invalid_argument (action_valid.second);
@@ -254,8 +251,10 @@ StrategoEnv::step (const Pos& action) {
     case GamePhase::DEPLOY: {
         valid_spots_to_place (action_mask);
         if (!action_mask[action[0] * width_ + action[1]]) {
-            // action = action_space_.sample();
-            throw std::invalid_argument ("Invalid deployment location");
+            auto sampled_action = action_space_.sample ();
+            action              = { static_cast<int8_t> (sampled_action[0]),
+                             static_cast<int8_t> (sampled_action[1]) };
+            // throw std::invalid_argument ("Invalid deployment location");
         }
 
         auto& curr_player = (current_player_ == Player::RED) ? p1_ : p2_;
@@ -344,8 +343,10 @@ StrategoEnv::step (const Pos& action) {
     case GamePhase::SELECT: {
         valid_pieces_to_select (action_mask);
         if (!action_mask[action[0] * width_ + action[1]]) {
-            // action = action_space_.sample();
-            throw std::invalid_argument ("Invalid piece selection");
+            auto sampled_action = action_space_.sample ();
+            action              = { static_cast<int8_t> (sampled_action[0]),
+                             static_cast<int8_t> (sampled_action[1]) };
+            // throw std::invalid_argument ("Invalid piece selection");
         }
 
         auto& player = (current_player_ == Player::RED) ? p1_ : p2_;
@@ -362,9 +363,10 @@ StrategoEnv::step (const Pos& action) {
 
         auto [valid, msg] = check_action_valid (src, dest);
         if (!valid) {
-            // action = action_space_.sample();
-            // dest = action;
-            throw std::invalid_argument (msg);
+            auto sampled_action = action_space_.sample ();
+            action              = { static_cast<int8_t> (sampled_action[0]),
+                             static_cast<int8_t> (sampled_action[1]) };
+            // throw std::invalid_argument (msg);
         }
 
         auto& curr_player = (current_player_ == Player::RED) ? p1_ : p2_;
