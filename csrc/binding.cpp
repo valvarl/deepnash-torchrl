@@ -187,16 +187,16 @@ PYBIND11_MODULE (stratego_cpp, m) {
         // game_phase_buf (0)   = static_cast<int> (game_phase);
         info["game_phase"] = np_int32 (static_cast<int> (game_phase));
 
-        // if (game_phase != GamePhase::MOVE) {
-        //     info["last_selected"] = py::none ();
-        // } else {
-        //     py::array_t<size_t> last_selected_array (2);
-        //     auto last_selected_buf = last_selected_array.mutable_unchecked<1>
-        //     (); Pos last_selected      = env.last_selected (current_player);
-        //     last_selected_buf (0)  = static_cast<int> (last_selected[0]);
-        //     last_selected_buf (1)  = static_cast<int> (last_selected[1]);
-        //     info["last_selected"]  = last_selected_array;
-        // }
+        if (game_phase != GamePhase::MOVE) {
+            info["last_selected"] = py::none ();
+        } else {
+            py::array_t<size_t> last_selected_array (2);
+            auto last_selected_buf = last_selected_array.mutable_unchecked<1> ();
+            Pos last_selected      = env.last_selected (current_player);
+            last_selected_buf (0)  = static_cast<int> (last_selected[0]);
+            last_selected_buf (1)  = static_cast<int> (last_selected[1]);
+            info["last_selected"]  = last_selected_array;
+        }
 
         return info;
     })
