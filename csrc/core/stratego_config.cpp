@@ -192,36 +192,36 @@ GameMode game_mode)
         throw std::invalid_argument (msg);
     }
 
-    std::ostringstream oss;
+    // std::ostringstream oss;
 
-    oss << "p1_deploy_mask\n";
-    for (size_t y = 0; y < height_; ++y) {
-        for (size_t x = 0; x < width_; ++x) {
-            oss << p1_deploy_mask_[y * width_ + x] ? "1 " : "0 ";
-        }
-        oss << "\n";
-    }
-    oss << "p2_deploy_mask\n";
-    for (size_t y = 0; y < height_; ++y) {
-        for (size_t x = 0; x < width_; ++x) {
-            oss << p2_deploy_mask_[y * width_ + x] ? "1 " : "0 ";
-        }
-        oss << "\n";
-    }
-    oss << "lakes_mask\n";
-    for (size_t y = 0; y < height_; ++y) {
-        for (size_t x = 0; x < width_; ++x) {
-            oss << lakes_mask_[y * width_ + x] ? "1 " : "0 ";
-        }
-        oss << "\n";
-    }
+    // oss << "p1_deploy_mask\n";
+    // for (size_t y = 0; y < height_; ++y) {
+    //     for (size_t x = 0; x < width_; ++x) {
+    //         oss << p1_deploy_mask_[y * width_ + x] ? "1 " : "0 ";
+    //     }
+    //     oss << "\n";
+    // }
+    // oss << "p2_deploy_mask\n";
+    // for (size_t y = 0; y < height_; ++y) {
+    //     for (size_t x = 0; x < width_; ++x) {
+    //         oss << p2_deploy_mask_[y * width_ + x] ? "1 " : "0 ";
+    //     }
+    //     oss << "\n";
+    // }
+    // oss << "lakes_mask\n";
+    // for (size_t y = 0; y < height_; ++y) {
+    //     for (size_t x = 0; x < width_; ++x) {
+    //         oss << lakes_mask_[y * width_ + x] ? "1 " : "0 ";
+    //     }
+    //     oss << "\n";
+    // }
 
-    oss << "allowed_pieces: " << allowed_pieces_;
-    oss << "\ntotal_moves_limit: " + std::to_string (total_moves_limit_);
-    oss << "\nmoves_since_attack_limit_: " + std::to_string (moves_since_attack_limit_);
-    oss << "\nobserved_history_entries_: " + std::to_string (observed_history_entries_);
+    // oss << "allowed_pieces: " << allowed_pieces_;
+    // oss << "\ntotal_moves_limit: " + std::to_string (total_moves_limit_);
+    // oss << "\nmoves_since_attack_limit_: " + std::to_string (moves_since_attack_limit_);
+    // oss << "\nobserved_history_entries_: " + std::to_string (observed_history_entries_);
 
-    std::cout << oss.str () << std::endl;
+    // std::cout << oss.str () << std::endl;
 }
 
 StrategoConfig StrategoConfig::from_game_mode (GameMode mode) {

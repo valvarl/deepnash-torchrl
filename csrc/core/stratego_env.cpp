@@ -168,7 +168,6 @@ void StrategoEnv::generate_env_state (std::vector<double>& obs, std::vector<bool
         valid_destinations (action_mask);
     }
     action_space_.set_mask (action_mask);
-    std::cout << "action_mask: " << action_space_.mask () << "\n";
 }
 
 void StrategoEnv::get_public_obs (const std::array<std::vector<bool>, 3>& public_obs_info,
@@ -279,25 +278,25 @@ StrategoEnv::step (const Pos& action) {
         board_[action[0] * width_ + action[1]] = deploy_piece;
         ++curr_player.deploy_idx_;
 
-        std::ostringstream oss;
+        // std::ostringstream oss;
 
-        // oss << "urevealed: " << curr_player.unrevealed_ << std::endl;
-        // oss << "allowed_pieces: " << allowed_pieces_ << std::endl;
+        // // oss << "urevealed: " << curr_player.unrevealed_ << std::endl;
+        // // oss << "allowed_pieces: " << allowed_pieces_ << std::endl;
 
-        oss << "board\n";
-        for (size_t y = 0; y < height_; ++y) {
-            for (size_t x = 0; x < width_; ++x) {
-                oss << std::to_string (board_[y * width_ + x]) << "\t";
-            }
-            oss << "\n";
-        }
+        // oss << "board\n";
+        // for (size_t y = 0; y < height_; ++y) {
+        //     for (size_t x = 0; x < width_; ++x) {
+        //         oss << std::to_string (board_[y * width_ + x]) << "\t";
+        //     }
+        //     oss << "\n";
+        // }
 
-        oss << "deploy_piece: " << deploy_piece;
-        oss << "\naction[0]: " << std::to_string (action[0])
-            << "\naction[1]: " << std::to_string (action[1]);
-        oss << "\nindex: " << std::to_string (action[0] * width_ + action[1]);
+        // oss << "deploy_piece: " << deploy_piece;
+        // oss << "\naction[0]: " << std::to_string (action[0])
+        //     << "\naction[1]: " << std::to_string (action[1]);
+        // oss << "\nindex: " << std::to_string (action[0] * width_ + action[1]);
 
-        std::cout << oss.str () << std::endl;
+        // std::cout << oss.str () << std::endl;
 
         bool curr_finish_deploy = curr_player.deploy_idx_ ==
         std::accumulate (
@@ -357,8 +356,8 @@ StrategoEnv::step (const Pos& action) {
         break;
     }
     case GamePhase::MOVE: {
-        auto src = (current_player_ == Player::RED) ? p1_.last_selected () :
-                                                      p2_.last_selected ();
+        auto src  = (current_player_ == Player::RED) ? p1_.last_selected () :
+                                                       p2_.last_selected ();
         auto dest = action;
 
         auto [valid, msg] = check_action_valid (src, dest);
@@ -416,7 +415,7 @@ StrategoEnv::step (const Pos& action) {
         chasing_detector_.update (current_player_,
         static_cast<Piece> (src_piece_val), _src, _dest, board_, height_, width_);
 
-        std::cout << "WARNING: check dest_piece_val negative\n";
+        // std::cout << "WARNING: check dest_piece_val negative\n";
 
         if (src_piece_val == -dest_piece_val) { // Equal Strength
             // remove both pieces
@@ -538,11 +537,11 @@ StrategoEnv::check_action_valid (const Pos& src, const Pos& dest) const {
     int8_t src_piece_val  = board_[src[0] * width_ + src[1]];
     int8_t dest_piece_val = board_[dest[0] * width_ + dest[1]];
 
-    std::cout << static_cast<int> (src_piece_val) << " "
-              << static_cast<int> (dest_piece_val);
-    std::cout << "SRC DEST: " << static_cast<int> (src[0]) << " "
-              << static_cast<int> (src[1]) << " " << static_cast<int> (dest[0])
-              << " " << static_cast<int> (dest[1]) << "\n";
+    // std::cout << static_cast<int> (src_piece_val) << " "
+    //           << static_cast<int> (dest_piece_val) << " ";
+    // std::cout << "SRC DEST: " << static_cast<int> (src[0]) << " "
+    //           << static_cast<int> (src[1]) << " " << static_cast<int> (dest[0])
+    //           << " " << static_cast<int> (dest[1]) << "\n";
 
     if (src_piece_val < static_cast<int8_t> (Piece::SPY)) {
         return { false, "Selected piece cannot be moved by player" };
@@ -851,7 +850,7 @@ void StrategoEnv::valid_destinations (std::vector<bool>& action_mask) const {
             Pos current_pos       = selected;
             int encountered_enemy = 0;
 
-            while (true) {
+            while (encountered_enemy < 1) {
                 // Update position
                 current_pos[0] += static_cast<int8_t> (dir.first);
                 current_pos[1] += static_cast<int8_t> (dir.second);
@@ -870,11 +869,6 @@ void StrategoEnv::valid_destinations (std::vector<bool>& action_mask) const {
                         break;
                     }
                     encountered_enemy++;
-                }
-
-                // Stop if encountered more than 1 enemy
-                if (encountered_enemy > 1) {
-                    break;
                 }
 
                 // Mark as valid destination

@@ -1,27 +1,34 @@
 import sys
 import os
 
+from stratego.wrappers.cpp_env import StrategoEnvCpp
+
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "python")))
+
+import numpy as np
+from stratego.wrappers.cpp_config import StrategoConfigCpp
+from stratego.core.primitives import Piece
 
 from stratego.cpp import stratego_cpp as sp
 
 # Define pieces for each player (Spy and Flag only)
-p1_pieces = {sp.Piece.SPY: 1, sp.Piece.FLAG: 1}
+p1_pieces = {Piece.SPY: 1, Piece.FLAG: 1}
 
-p2_pieces = {sp.Piece.SPY: 1, sp.Piece.FLAG: 1}
+p2_pieces = {Piece.SPY: 1, Piece.FLAG: 1}
 
-init_from_mask = True
+init_from_mask = False
 
 if not init_from_mask:
     # Define lake position (center 2x2 area)
-    lakes = [((1, 3), (1, 3))]
+    lakes = [((1, 1), (2, 2))]
 
     # Define deployment areas (top and bottom rows)
     p1_deploy = [((3, 0), (3, 3))]
 
     p2_deploy = [((0, 0), (0, 3))]
     # Create config
-    config = sp.StrategoConfig(
+
+    config = StrategoConfigCpp(
         height=4,
         width=4,
         p1_pieces=p1_pieces,
@@ -37,25 +44,14 @@ else:
     height = 4
     width = 4
 
-    # Инициализируем маски нулями
-    lakes_mask = [False] * (height * width)
-    p1_deploy_mask = [False] * (height * width)
-    p2_deploy_mask = [False] * (height * width)
+    lakes_mask = np.zeros((4, 4), dtype=bool)
+    lakes_mask[1:3, 1:3] = True
+    p1_deploy_mask = np.zeros((4, 4), dtype=bool)
+    p1_deploy_mask[3] = True
+    p2_deploy_mask = np.zeros((4, 4), dtype=bool)
+    p2_deploy_mask[0] = True
 
-    # Заполняем lake в центре (1,1)-(2,2)
-    for y in range(1, 3):
-        for x in range(1, 3):
-            lakes_mask[y * width + x] = True
-
-    # Игрок 1: нижняя строка (y = 3)
-    for x in range(width):
-        p1_deploy_mask[3 * width + x] = True
-
-    # Игрок 2: верхняя строка (y = 0)
-    for x in range(width):
-        p2_deploy_mask[0 * width + x] = True
-
-    config = sp.StrategoConfig(
+    config = StrategoConfigCpp(
         height=4,
         width=4,
         p1_pieces=p1_pieces,
@@ -68,7 +64,7 @@ else:
         observed_history_entries=10,
     )
 
-env = sp.StrategoEnv(config)
+env = StrategoEnvCpp(config)
 print(env.game_phase)
 env.reset()
 print(env.game_phase)

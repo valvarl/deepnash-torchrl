@@ -91,10 +91,14 @@ class StrategoEnvBase(Env):
                 elif board[r][c] <= -Piece.FLAG.value:
                     pygame.draw.rect(self.window, (24, 118, 181), rect)
                     render_text = (
-                        "*"
+                        "F"
                         if board[r][c] == -Piece.FLAG.value
-                        else "*" if board[r][c] == -Piece.BOMB.value else "*"
-                    )  # str(-(board[r][c] + 3))
+                        else (
+                            "B"
+                            if board[r][c] == -Piece.BOMB.value
+                            else str(-(board[r][c] + 3))
+                        )
+                    )
                     text = font.render(render_text, True, (255, 255, 255))
                 else:
                     pygame.draw.rect(self.window, (242, 218, 180), rect)

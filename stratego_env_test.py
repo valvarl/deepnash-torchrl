@@ -29,22 +29,31 @@ def basic_test():
     count = 0
     games = 0
     while time.time() - start_time < 60:
-        try:
-            action = env.action_space.sample()
-        except Exception:
-            print(env.board)
-            print(env.chasing_detector.chase_moves)
-            print("p1", env.two_square_detector.p1)
-            print("p2", env.two_square_detector.p2)
-            print(env.player)
-            print(env.p2.last_selected)
-            print(env.p2.last_selected_piece)
-            pos = env.two_square_detector.p2[-1][1]
-            piece = Piece(env.board[pos])
-            print(env.two_square_detector.validate_select(Player.BLUE, piece, pos))
-            print(env.valid_pieces_to_select())
+        # try:
+        #     action = env.action_space.sample()
+        # except Exception:
+        #     print(env.board)
+        #     print(env.chasing_detector.chase_moves)
+        #     print("p1", env.two_square_detector.p1)
+        #     print("p2", env.two_square_detector.p2)
+        #     print(env.player)
+        #     print(env.p2.last_selected)
+        #     print(env.p2.last_selected_piece)
+        #     pos = env.two_square_detector.p2[-1][1]
+        #     piece = Piece(env.board[pos])
+        #     print(env.two_square_detector.validate_select(Player.BLUE, piece, pos))
+        #     print(env.valid_pieces_to_select())
 
+        action = env.action_space.sample()
         state, reward, terminated, truncated, info = env.step(action)
+        # try:
+        #     state, reward, terminated, truncated, info = env.step(action)
+        #     action_mask = state["action_mask"]
+        # except ValueError as e:
+        #     print(info["cur_board"])
+        #     print(action_mask)
+        #     raise e
+
         # env.render()
         # time.sleep(0.1)
         count += 1
@@ -53,15 +62,15 @@ def basic_test():
             print(
                 f"Game over! Player {-1 * info['cur_player']} received {reward}, game: {games}, turn: {info['total_moves']}, turn: {info['moves_since_attack']}"
             )
-            if reward == 0 and not (
-                info["total_moves"] == 2000 or info["moves_since_attack"] == 200
-            ):
-                # print(env.draw_conditions)
-                print(env.board)
-                print("p1", env.two_square_detector.p1)
-                print("p2", env.two_square_detector.p2)
-                print(env.player)
-                exit()
+            # if reward == 0 and not (
+            #     info["total_moves"] == 2000 or info["moves_since_attack"] == 200
+            # ):
+            #     # print(env.draw_conditions)
+            #     print(env.board)
+            #     print("p1", env.two_square_detector.p1)
+            #     print("p2", env.two_square_detector.p2)
+            #     print(env.player)
+            #     exit()
             env.reset()
     print(count)
 
@@ -73,7 +82,7 @@ def policy_test():
 
     reader = default_info_dict_reader(["cur_player"])
     env = (
-        GymEnv("stratego_gym/Stratego-v0", render_mode=None)
+        GymEnv("stratego_gym/StrategoCpp-v0", render_mode=None)
         .set_info_dict_reader(reader)
         .to(device)
     )
@@ -157,6 +166,6 @@ def vectorized_test(n_procs, n_workers):
 
 if __name__ == "__main__":
     # vectorized_test(4, 4)
-    # policy_test()
-    basic_test()
+    policy_test()
+    # basic_test()
     # rollout_test()

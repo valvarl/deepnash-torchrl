@@ -46,7 +46,12 @@ def play_with_mouse():
                 print(row, col)
                 count += 1
 
-                state, reward, terminated, truncated, info = env.step((row, col))
+                try:
+                    state, reward, terminated, truncated, info = env.step((row, col))
+                    action_mask = state["action_mask"]
+                except ValueError:
+                    print(info["cur_board"])
+                    print(action_mask)
                 if terminated:
                     print(
                         f"Game over! Player {-1 * info['cur_player']} received {reward}"
