@@ -16,6 +16,8 @@ class StrategoEnvCpp(StrategoEnvBase):
     def __init__(
         self, config: StrategoConfigCpp | None = None, render_mode: str | None = None
     ):
+        super().__init__(render_mode=render_mode)
+
         self._config = config
         if config is None:
             self._config = StrategoConfigCpp.from_game_mode(GameMode.ORIGINAL)
