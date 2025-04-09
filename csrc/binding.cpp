@@ -166,26 +166,12 @@ PYBIND11_MODULE (stratego_cpp, m) {
         allowed_pieces.size (), allowed_pieces.data ());
         info["allowed_pieces"] = allowed_pieces_array;
 
-        py::array_t<int> num_pieces_array (1);
-        auto num_pieces_buf = num_pieces_array.mutable_unchecked<1> ();
-        num_pieces_buf (0)  = static_cast<int> (allowed_pieces.size ());
-        info["num_pieces"]  = num_pieces_array;
+        info["num_pieces"] = np_int32 (static_cast<int> (allowed_pieces.size ()));
+        info["total_moves"]        = np_int32 (env.total_moves ());
+        info["moves_since_attack"] = np_int32 (env.moves_since_attack ());
 
-        py::array_t<int> total_moves_array (1);
-        auto total_moves_buf = total_moves_array.mutable_unchecked<1> ();
-        total_moves_buf (0)  = env.total_moves ();
-        info["total_moves"]  = total_moves_array;
-
-        py::array_t<int> moves_since_attack_array (1);
-        auto moves_since_attack_buf = moves_since_attack_array.mutable_unchecked<1> ();
-        moves_since_attack_buf (0) = env.moves_since_attack ();
-        info["moves_since_attack"] = moves_since_attack_array;
-
-        // py::array_t<int> game_phase_array (1);
-        // auto game_phase_buf  = game_phase_array.mutable_unchecked<1> ();
         GamePhase game_phase = env.game_phase ();
-        // game_phase_buf (0)   = static_cast<int> (game_phase);
-        info["game_phase"] = np_int32 (static_cast<int> (game_phase));
+        info["game_phase"]   = np_int32 (static_cast<int> (game_phase));
 
         if (game_phase != GamePhase::MOVE) {
             info["last_selected"] = py::none ();

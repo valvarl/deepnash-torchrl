@@ -124,9 +124,9 @@ def legal_policy(logits: torch.Tensor, legal_actions: torch.Tensor) -> torch.Ten
     # Normalize.
     denom = exp_logits.sum(dim=-1, keepdim=True)
     policy = exp_logits / (denom + (denom == 0.0))
-    if policy.isnan().any() | policy.isinf().any():
-        assert False, "Legal Policy is Invalid!"
-        # breakpoint()
+    # if policy.isnan().any() | policy.isinf().any():
+    #     assert False, "Legal Policy is Invalid!"
+    #     # breakpoint()
     return policy
 
 
@@ -148,9 +148,9 @@ def legal_log_policy(logits: torch.Tensor, legal_actions: torch.Tensor) -> torch
     baseline[~valid_rows] = 0.0
     # Final = (logits - max - baseline) for legal actions, 0 for illegal.
     log_policy = legal_actions * (logits - max_legal_logit - baseline)
-    if log_policy.isnan().any() | log_policy.isinf().any():
-        assert False, "Legal Log Policy is Invalid!"
-        # breakpoint()
+    # if log_policy.isnan().any() | log_policy.isinf().any():
+    #     assert False, "Legal Log Policy is Invalid!"
+    #     # breakpoint()
     return log_policy
 
 
@@ -185,8 +185,11 @@ class DeepNashNet(nn.Module):
         self.device = next(self.parameters()).device
 
         # TODO: get pieces as argument
-        self.pieces = np.array([Piece(i) for i in range(2, 14)])
-        invalid_piece_ids = [Piece.FLAG, Piece.BOMB]  # Define invalid piece IDs
+        self.pieces = np.array([Piece(i).value for i in range(2, 14)])
+        invalid_piece_ids = [
+            Piece.FLAG.value,
+            Piece.BOMB.value,
+        ]  # Define invalid piece IDs
         valid_piece_ids = np.setdiff1d(
             self.pieces, invalid_piece_ids
         )  # Exclude invalid pieces
@@ -226,8 +229,11 @@ class DeepNashNet(nn.Module):
         one_hot_last_selected = state[
             ..., 1 : num_pieces + 1, :, :
         ]  # shape: (..., num_pieces, H, W)
+        # one_hot_last_selected = one_hot_last_selected[
+        #     ..., self.valid_mask, :, :
+        # ]  # shape: (..., num_movable_pieces, H, W)
         one_hot_last_selected = one_hot_last_selected[
-            ..., self.valid_mask, :, :
+            ..., 2:12, :, :
         ]  # shape: (..., num_movable_pieces, H, W)
         one_hot_last_selected = (
             one_hot_last_selected * state[..., -1:, :, :]

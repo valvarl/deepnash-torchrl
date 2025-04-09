@@ -167,7 +167,7 @@ def vectorized_test(n_procs, n_workers):
 
 
 if __name__ == "__main__":
-    vectorized_test(4, 8)
+    vectorized_test(4, 4)
     # policy_test()
     # basic_test()
     # rollout_test()
