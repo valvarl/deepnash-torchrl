@@ -17,9 +17,10 @@ from .network import DeepNashNet
 class DeepNashAgent(TensorDictModule):
     def __init__(self, compile: bool = False, *args, **kwargs):
         # TODO: Add Loading from the config at some point. Device should also be a part of the config
-        net = DeepNashNet(32, 64, 0, 0)  # Default
+        net = DeepNashNet(320, 256, 2, 2)  # Default
 
         if compile:
+            torch.set_float32_matmul_precision("high")
             net = torch.compile(net, backend="inductor", dynamic=False, fullgraph=True)
 
         # Call TensorDictModule constructor
