@@ -1,9 +1,12 @@
 import argparse
 from functools import partial
 import logging
+import os
+import tempfile
 from time import perf_counter
 
 import gymnasium as gym
+import torch
 from torchrl.collectors import (
     MultiSyncDataCollector,
     MultiaSyncDataCollector,
@@ -200,6 +203,15 @@ def rollout_test(
     }
 
 
+def get_directory_size(path):
+    total_size = 0
+    for dirpath, dirnames, filenames in os.walk(path):
+        for f in filenames:
+            file_path = os.path.join(dirpath, f)
+            total_size += os.path.getsize(file_path)
+    return total_size
+
+
 def vectorized_test(
     env_name,
     device,
@@ -224,18 +236,47 @@ def vectorized_test(
     env = make_env(env_name)
     agent(env.reset())
 
-    memory = ReplayBuffer(
-        storage=LazyTensorStorage(max_steps, ndim=2),
-        sampler=SliceSampler(num_slices=4, traj_key=("collector", "traj_ids")),
+    from torchrl.data import (
+        TensorDictReplayBuffer,
+        H5StorageCheckpointer,
+        NestedStorageCheckpointer,
+        FlatStorageCheckpointer,
     )
 
-    collector = MultiaSyncDataCollector(
+    def collate(data):
+        print(data)
+        # print(data["collector"]["traj_ids"].tolist())
+        # print(torch.unique(data["collector"]["traj_ids"]))
+        return data[0]
+
+    from torchrl.data.replay_buffers import (
+        LazyMemmapStorage,
+        LazyMemmapStorage,
+        TensorDictReplayBuffer,
+        ListStorage,
+    )
+
+    memory = ReplayBuffer(
+        storage=LazyMemmapStorage(1, ndim=1),
+        # sampler=SliceSampler(
+        #     slice_len=250, traj_key=("collector", "traj_ids"), strict_length=True
+        # ),
+        checkpointer=FlatStorageCheckpointer(),
+        batch_size=2,
+        collate_fn=collate,
+        dim_extend=0,
+    )
+
+    collector = MultiSyncDataCollector(
         [ParallelEnv(n_workers, partial(make_env, env_name))] * n_procs,
         agent,
-        frames_per_batch=max_steps,
+        frames_per_batch=3600 * n_workers * n_procs,
+        max_frames_per_traj=3600,
+        reset_at_each_iter=False,
         total_frames=-1,
-        cat_results="stack",
+        cat_results=0,
         device=device,
+        split_trajs=True,
     )
 
     start_time = perf_counter()
@@ -244,7 +285,34 @@ def vectorized_test(
 
     for data in collector:
         frames = data.numel()
-        memory.extend(data)
+        print(list(data["collector"].keys()))
+        print(data["collector"]["traj_ids"][:, 10])
+        print(data["collector"]["traj_ids"][:, -10])
+
+        from tensordict import pad, pad_sequence
+
+        # print()
+
+        mask_lens = data["collector"]["mask"].sum(dim=-1)
+
+        for i, chank in enumerate(data):
+            # mask_len = mask_lens[i]
+            # chank = chank[:mask_len]
+            chank.set("obs", chank["obs"].to(torch.float16))
+            chank["next"].set("obs", chank["next"]["obs"].to(torch.float16))
+
+            chank.set("action", chank["action"].to(torch.bool))
+            chank.set("action_mask", chank["action_mask"].to(torch.bool))
+            chank["next"].set(
+                "action_mask", chank["next"]["action_mask"].to(torch.bool)
+            )
+
+            chank = pad(chank, [0, 3600 - chank.shape[0]])[None,]
+            print(chank)
+            print(chank.shape)
+            print(chank.batch_size)
+            print(memory.extend(chank))
+
         total_frames += frames
         batches += 1
         logger.info(
@@ -255,6 +323,27 @@ def vectorized_test(
             break
 
     collector.shutdown()
+    del collector
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        memory.dump(tmpdir)
+        dir_size = get_directory_size(tmpdir)
+        print(f"Size of temporary directory: {dir_size} bytes")
+
+    # data = memory.sample()
+    # print(1, data)
+
+    # data = memory.sample()
+    # print(2, data)
+
+    # data = memory.sample()
+    # print(3, data)
+
+    # data = memory.sample()
+    # print(4, data)
+
+    # data = memory.sample()
+    # print(5, data)
 
     elapsed = perf_counter() - start_time
     fps = total_frames / elapsed
