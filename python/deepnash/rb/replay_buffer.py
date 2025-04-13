@@ -131,18 +131,20 @@ class CustomReplayBufferEnsemble(ReplayBufferEnsemble):
             total_frames_added += chunk.shape[0]
 
             # Determine sub-buffer index based on trajectory length; each sub-buffer expects chunks padded to multiples of 200.
-            sub_buffer_index = int(chunk.shape[0] / 200)
+            sub_buffer_index = int((chunk.shape[0] + 199) / 200 - 1)
             assert 0 <= sub_buffer_index < 18
 
             # Pad the chunk to match the exact required number of frames (multiple of 200)
             padded_chunk = tensordict.pad(
-                chunk, [0, sub_buffer_index * 200 - chunk.shape[0]]
+                chunk, [0, (sub_buffer_index + 1) * 200 - chunk.shape[0]]
             )[
                 None,
             ]
             # Extend the corresponding sub-buffer with the padded chunk.
             self[sub_buffer_index].extend(padded_chunk)
-            print(f"Trajectory {traj_id} added with shape {padded_chunk.shape}")
+            print(
+                f"Trajectory {traj_id} added with shape {padded_chunk.shape} index {sub_buffer_index}"
+            )
             games_added += 1
 
         # Output the list of trajectory IDs that remain unfinished.
