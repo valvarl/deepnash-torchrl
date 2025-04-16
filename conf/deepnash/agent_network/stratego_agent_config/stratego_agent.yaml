@@ -1,0 +1,4 @@
+input_channels: 320
+output_channels: 256
+N: 2
+M: 2

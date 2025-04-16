@@ -1,6 +1,0 @@
-deployment_config:
-  mode: "sequential"
-  sequential_actor_learner_ratio: 0.25
-  sequential_step_duration: 300
-  num_instances: 1
-  instance_gpu_capacity: 1

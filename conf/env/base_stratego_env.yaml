@@ -1,0 +1,6 @@
+defaults:
+  - _self_
+  - stratego_config: original
+
+stratego_config:
+  cpp_backend: true

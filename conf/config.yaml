@@ -1,0 +1,12 @@
+defaults:
+  - _self_
+
+  - deepnash/agent_network: base_stratego_agent
+
+  - deepnash/learn: rnad_solver
+
+  - env: base_stratego_env
+  
+  # - override env/stratego_config: limited_4x4
+  # - override deepnash/agent_network/stratego_agent_config: stratego_agent_tiny
+  - override deepnash/learn/deployment_config: device_2_instance_1

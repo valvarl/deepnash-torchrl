@@ -1,0 +1,6 @@
+defaults:
+  - _self_
+  - stratego_agent_config: stratego_agent
+
+stratego_agent_config:
+  compile: true

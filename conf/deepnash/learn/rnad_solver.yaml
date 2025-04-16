@@ -1,5 +1,6 @@
 defaults:
-  - deployment_config: deployment/default_solver
+  - _self_
+  - deployment_config: device_2_instance_1
 
 adam_config:
   b1: 0.0
@@ -32,6 +33,12 @@ rnad_config:
   c_vtrace: 1.0
   seed: 42
 
+collector_config:
+  -
+
+replay_buffer_config:
+  -
+
 deployment_config:
   mode: "parallel"  # or sequential (for single device only)
   sequential_actor_learner_ratio: 0.25
@@ -42,11 +49,13 @@ deployment_config:
   learner_gpu_count: 1
   shared_replay_buffer: false
 
-event_config:
-  use_wandb: true
-  log_mod: 10
-  expl_mod: 20
-  checkpoint_mod: 50
-  intra_instance_sync_mod: 5
-  inter_instance_sync_mod: 20
-  actor_update_mod: 5
+monitoring_config:
+  wandb: true
+  log_interval: 10
+  expl_interval: 20
+  checkpoint_interval: 50
+  sync_intervals:
+    intra_instance: 5
+    inter_instance: 20
+  actor_update_interval: 5
+

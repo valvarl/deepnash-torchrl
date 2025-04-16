@@ -1,6 +1,9 @@
 saved_runs/
 wandb/
 
+# Hydra
+outputs/
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
@@ -128,6 +131,7 @@ celerybeat.pid
 .env
 .venv
 env/
+!conf/env/
 venv/
 ENV/
 env.bak/
