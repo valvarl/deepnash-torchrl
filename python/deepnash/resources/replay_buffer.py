@@ -1,4 +1,7 @@
-from deepnash.rb.transforms import CompletedTrajectoryRepertoire, DequantizeTransform
+from deepnash.resources.transforms import (
+    CompletedTrajectoryRepertoire,
+    DequantizeTransform,
+)
 import tensordict
 import torch
 import random

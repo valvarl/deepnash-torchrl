@@ -8,7 +8,7 @@ from tqdm import tqdm
 
 from deepnash.nn import DeepNashAgent
 from deepnash.learn.rnad import RNaDSolver
-from deepnash.learn.config import RNaDConfig
+from deepnash.learn.configs import RNaDConfig
 from stratego.core.config import StrategoConfig
 from stratego.core.primitives import Piece
 from stratego.core.stratego import (

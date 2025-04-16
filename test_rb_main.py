@@ -18,8 +18,8 @@ from torchrl.envs import GymEnv, TrajCounter
 from torchrl.envs import default_info_dict_reader, ParallelEnv, SerialEnv
 
 from deepnash import DeepNashAgent
-from deepnash.rb.replay_buffer import CustomReplayBufferEnsemble
-from deepnash.rb.transforms import QuantizeTransform
+from deepnash.resources.replay_buffer import CustomReplayBufferEnsemble
+from deepnash.resources.transforms import QuantizeTransform
 
 
 def setup_logger(log_to_file=False, filename="benchmark_log.txt"):
