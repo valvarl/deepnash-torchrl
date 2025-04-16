@@ -1,0 +1,6 @@
+deployment_config:
+  mode: "parallel"
+  num_instances: 1
+  instance_gpu_capacity: 8
+  actor_gpu_count: 2
+  learner_gpu_count: 6

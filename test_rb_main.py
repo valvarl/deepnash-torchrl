@@ -94,15 +94,15 @@ def vectorized_test(
         ),
         # env,
         agent,
-        frames_per_batch=3600 * n_workers * n_procs,
+        frames_per_batch=3600 * 2,
         max_frames_per_traj=3600,
         # reset_at_each_iter=False,
         total_frames=-1,
         # cat_results="stack",
-        # device=device,
-        policy_device=device,
-        env_device="cpu",
-        storing_device="cpu",
+        device=device,
+        # policy_device=device,
+        # env_device="cpu",
+        # storing_device=device,
         split_trajs=True,
         # postproc=QuantizeTransform(
         #     in_keys=["obs", ("next", "obs")],
@@ -127,7 +127,7 @@ def vectorized_test(
 
         data.set("priority", data["value"])
 
-        print(data)
+        # print(data)
 
         total_frames_added, games_added, games_stashed, games_recovered = (
             memory.extend_batch(data)

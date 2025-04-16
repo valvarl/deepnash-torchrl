@@ -73,3 +73,42 @@ class RNaDConfig:
 
     # The seed that fully controls the randomness.
     seed: int = 42
+
+
+class DeploymentMode(str, Enum):
+    """Enum for deployment modes."""
+
+    SEQUENTIAL = "sequential"
+    PARALLEL = "parallel"
+
+
+@dataclass(frozen=True)
+class DeploymentConfig:
+    """Deployment configuration for GPU usage in actor and learner."""
+
+    mode: DeploymentMode = DeploymentMode.PARALLEL
+    sequential_actor_learner_ratio: float = 1 / 4
+    sequential_step_duration: int = 300
+
+    num_instances: int = 1
+    instance_gpu_capacity: int = 2
+
+    actor_gpu_count: int = 1
+    learner_gpu_count: int = 1
+
+    shared_replay_buffer: bool = False
+
+
+@dataclass(frozen=True)
+class EventConfig:
+    use_wandb: bool = True
+
+    log_mod: int = 5
+
+    expl_mod: int = 20
+
+    checkpoint_mod: int = 20
+
+    intra_instance_sync_mod: int = 5
+    inter_instance_sync_mod: int = 20
+    actor_update_mod: int = 5

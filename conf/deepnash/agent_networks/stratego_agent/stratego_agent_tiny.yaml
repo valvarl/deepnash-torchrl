@@ -1,0 +1,8 @@
+defaults:
+  - base_stratego_agent
+
+StrategoAgentConfig:
+  input_channels: 64
+  output_channels: 32
+  N: 0
+  M: 0
