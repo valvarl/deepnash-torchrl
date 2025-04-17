@@ -1,2 +1,7 @@
+gymnasium~=0.29.0
+numpy
+pygame~=2.6.1
+torchrl
+torch
 hydra-core
 wandb

@@ -6,18 +6,18 @@ with the environment
 from dataclasses import dataclass
 from typing import Any, Union
 
-import numpy as np
 import torch
 from tensordict import TensorDictBase
-from tensordict.nn import TensorDictModule
 from torch import Tensor
 
-from deepnash.agents import DeepNashAgent
+from deepnash.config import DeepNashAgent, DeepNashAgentConfig
+from deepnash.agents.registry import register_module
 from .network import StrategoNet
 
 
+@register_module()
 @dataclass(frozen=True)
-class StrategoAgentConfig:
+class StrategoAgentConfig(DeepNashAgentConfig):
     class_name: str = "StrategoAgent"
     compile: bool = True
     inner_channels: int = 320
@@ -26,6 +26,7 @@ class StrategoAgentConfig:
     M: int = 2
 
 
+@register_module()
 class StrategoAgent(DeepNashAgent):
     def __init__(self, cfg: StrategoAgentConfig):
         net = StrategoNet(cfg.inner_channels, cfg.outer_channels, cfg.N, cfg.M)

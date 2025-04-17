@@ -1,0 +1,10 @@
+defaults:
+  - _self_
+  - solver: rnad
+  - deployment: device_2_instance_1
+  - event: event
+  - collector: sync_data_collector
+  - replay_buffer: ensemble_replay_buffer
+
+directory_name: null
+use_same_init_net_as: false

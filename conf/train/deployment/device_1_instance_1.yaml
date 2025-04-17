@@ -1,4 +1,4 @@
-# @package deepnash.training.deployment_config
+# @package train.deployment_config
 
 mode: "sequential"
 sequential_actor_learner_ratio: 0.25

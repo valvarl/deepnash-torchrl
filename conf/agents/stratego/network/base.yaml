@@ -1,0 +1,6 @@
+# @package agents.stratego.agent_config
+
+inner_channels: 320
+outer_channels: 256
+N: 2
+M: 2

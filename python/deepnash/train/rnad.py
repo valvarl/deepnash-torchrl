@@ -17,9 +17,9 @@ from torchrl.collectors import (
 from torchrl.envs import ParallelEnv
 import wandb
 
-from deepnash.agents.stratego import StrategoAgent
-from deepnash.training.config import RNaDConfig
-from deepnash.training.vtrace import EntropySchedule, get_loss_nerd, get_loss_v, v_trace
+from deepnash import DeepNashAgent
+from deepnash.config import TrainingConfig
+from deepnash.train.vtrace import EntropySchedule, get_loss_nerd, get_loss_v, v_trace
 
 
 def kld(
@@ -46,19 +46,18 @@ def kld(
 class RNaDSolver:
     def __init__(
         self,
-        config: RNaDConfig,
-        device=torch.device("cuda"),
-        directory_name=None,
-        wandb=False,
-        use_same_init_net_as=False,
+        config: TrainingConfig,
     ):
-        self.device = device
-        self.config = config
-        self.wandb = wandb
+        self.agent_config = config.agent_config
+        self.rnad_config = config.rnad_config
+        self.deployment_config = config.deployment_config
+        self.event_config = config.event_config
+        self.collector_config = config.collector_config
+        self.replay_buffer_config = config.replay_buffer_config
 
-        if directory_name is None:
-            directory_name = datetime.now().strftime("%y%m%d_%H%M")
-        self.directory_name = directory_name
+        if config.directory_name is None:
+            config.directory_name = datetime.now().strftime("%y%m%d_%H%M")
+        self.directory_name = config.directory_name
 
         self.saved_keys = list(self.__dict__.keys())
         # only the above members are saved in and reloaded from the 'params' object
@@ -72,9 +71,9 @@ class RNaDSolver:
             os.path.dirname(os.path.realpath(__file__)),
             "..",
             "saved_runs",
-            directory_name,
+            config.directory_name,
         )
-        self.use_same_init_net_as = use_same_init_net_as
+        self.use_same_init_net_as = config.use_same_init_net_as
 
         self.m = 0
         self.n = 0

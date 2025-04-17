@@ -1,13 +1,4 @@
-# @package deepnash.training
-
-adam_config: &adam_config
-  b1: 0.0
-  b2: 0.999
-  eps: 1e-8
-
-nerd_config: &nerd_config
-  beta: 2.0
-  clip: 10000
+# @package train
 
 rnad_config:
   game_name: "stratego"
@@ -16,12 +7,17 @@ rnad_config:
   policy_network_layers: [256, 256]
   batch_size: 256
   learning_rate: 0.0005
-  adam: *adam_config
+  adam:
+    b1: 0.0
+    b2: 0.999
+    eps: 1e-8
   clip_gradient: 10000
   target_network_avg: 0.001
   entropy_schedule_repeats: [200, 1]
   entropy_schedule_size: [100, 100]
   eta_reward_transform: 0.2
-  nerd: *nerd_config
+  nerd:
+    beta: 2.0
+    clip: 10000
   c_vtrace: 1.0
   seed: 42

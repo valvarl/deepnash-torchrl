@@ -1,2 +1,2 @@
-from deepnash.nn.agent import DeepNashAgent
-from deepnash.learn.solver import RNaDSolver
+from deepnash.agents.stratego import StrategoAgent, StrategoAgentConfig
+from deepnash.config import DeepNashAgent, DeepNashAgentConfig

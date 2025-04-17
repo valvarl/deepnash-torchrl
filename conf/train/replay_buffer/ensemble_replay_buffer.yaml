@@ -1,0 +1,13 @@
+# @package train
+
+replay_buffer_config:
+  buffer_type: "ensemble"
+  save_dir: "data"
+  buffer_capacity: 1000
+  max_trajectory_length: 3600
+  buffer_lengths: null
+  min_length: 200
+  max_length: 3600
+  step: 200
+  prioritized_replay: false
+  obs_quantization: false

@@ -1,13 +1,12 @@
-# @package deepnash.training
+# @package train
 
 defaults:
   - _self_
 
-
-monitoring_config:
+event_config:
   wandb: true
   log_interval: 10
-  expl_interval: 20
+  eval_interval: 20
   checkpoint_interval: 50
   sync_intervals:
     intra_instance: 5
