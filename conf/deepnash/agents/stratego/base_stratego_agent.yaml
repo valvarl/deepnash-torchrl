@@ -1,0 +1,7 @@
+defaults:
+  - _self_
+  - network: base
+
+agent_config:
+  class_name: StrategoAgent
+  compile: true

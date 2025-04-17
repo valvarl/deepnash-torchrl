@@ -1,3 +1,5 @@
+# @package envs.stratego.stratego_config
+
 height: 4
 width: 4
 p1_pieces: &default_pieces

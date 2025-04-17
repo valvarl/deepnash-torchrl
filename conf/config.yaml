@@ -1,12 +1,48 @@
 defaults:
+  # 1) `deepnash/agents` defines which agent configuration will be used. By default,
+  # it loads `base_agent.yaml` which could be a base configuration for your agent setup.
+  # You can override this to use specific agent configurations (e.g., `stratego_agent.yaml`).
+  - deepnash/agents: base_agent
+
+  # 2) `deepnash/training` defines which training configuration will be used. The default is
+  # `base_training.yaml`, which could include general training parameters (like optimizer settings).
+  # You can override this to use different solvers (e.g., `rnad.yaml`) or deployment configurations
+  # (e.g., `device_2_instance_1.yaml`).
+  - deepnash/training: base_training
+
+  # 3) `deepnash/resources` specifies the resource configuration. By default, it uses `base_resources.yaml`.
+  # You can override this to define specific resources like the `collector` or `replay_buffer`.
+  - deepnash/resources: base_resources
+
+  # 4) `envs` defines which environment configuration will be loaded. By default, it uses `base_env.yaml`.
+  # You can override this to load a specific environment (e.g., `base_stratego_env.yaml` or any other configuration in `stratego`).
+  - envs: base_env
+
+  # ——— Override Examples ———
+  # These lines are commented out, but they show how you could override specific parts of the configuration.
+  # 5) Override game mode configuration for `stratego` to use `limited_4x4` instead of the default `original`.
+  # - override envs/stratego/game_mode: limited_4x4
+  
+  # 6) Override the agent configuration to use the `tiny.yaml` instead of the default `stratego_agent.yaml`.
+  # - override deepnash/agents/stratego/network: base
+  
+  # 7) Override deployment configuration to use a specific device instance (e.g., `device_8_instance_1.yaml`).
+  # - override deepnash/training/deployment: device_8_instance_1
+
+  # 8) `_self_` ensures that this config (config.yaml) is loaded with the defaults set here.
   - _self_
 
-  - deepnash/agent_network: base_stratego_agent
+deepnash:
+  agents:
+    stratego:
+      agent_config:
+        compile: true
 
-  - deepnash/learn: rnad_solver
+  training:
+    monitoring_config:
+      wandb: true
 
-  - env: base_stratego_env
-  
-  # - override env/stratego_config: limited_4x4
-  # - override deepnash/agent_network/stratego_agent_config: stratego_agent_tiny
-  - override deepnash/learn/deployment_config: device_2_instance_1
+env:
+  stratego:
+    stratego_config:
+      cpp_backend: true

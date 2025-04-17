@@ -1,0 +1,15 @@
+# @package deepnash.training
+
+defaults:
+  - _self_
+
+
+monitoring_config:
+  wandb: true
+  log_interval: 10
+  expl_interval: 20
+  checkpoint_interval: 50
+  sync_intervals:
+    intra_instance: 5
+    inter_instance: 20
+  actor_update_interval: 5

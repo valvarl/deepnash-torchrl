@@ -1,0 +1,9 @@
+# @package envs.stratego
+
+defaults:
+  - _self_
+  - game_mode: original
+
+stratego_config:
+  cpp_backend: true
+  render_mode: null
