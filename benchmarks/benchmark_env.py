@@ -16,7 +16,7 @@ from torchrl.data import LazyTensorStorage, SliceSampler, ReplayBuffer
 from torchrl.envs.libs.gym import GymEnv
 from torchrl.envs import default_info_dict_reader, ParallelEnv
 
-from deepnash import DeepNashAgent
+from deepnash.agents.stratego import StrategoAgent
 
 
 def setup_logger(log_to_file=False, filename="benchmark_log.txt"):
@@ -93,7 +93,7 @@ def policy_test(env_name, device, compile_policy, duration, log_to_file=False):
         f"Starting policy_test on '{env_name}' for {duration}s using device: {device}"
     )
 
-    agent = DeepNashAgent(compile=compile_policy).to(device)
+    agent = StrategoAgent(compile=compile_policy).to(device)
 
     env = make_env(env_name).to(device)
     tensordict = env.reset()
@@ -152,7 +152,7 @@ def rollout_test(
         f"Using environment: {env_name}, device: {device}, duration: {duration}s"
     )
 
-    agent = DeepNashAgent(compile=compile_policy).to(device)
+    agent = StrategoAgent(compile=compile_policy).to(device)
 
     env = make_env(env_name).to(device)
     tensordict = env.reset()
@@ -230,7 +230,7 @@ def vectorized_test(
         f"Using environment: {env_name}, device: {device}, duration: {duration}s"
     )
 
-    agent = DeepNashAgent(compile=compile_policy)
+    agent = StrategoAgent(compile=compile_policy)
 
     # Trigger lazy initialization
     env = make_env(env_name)

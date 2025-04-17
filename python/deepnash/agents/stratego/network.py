@@ -154,9 +154,9 @@ def legal_log_policy(logits: torch.Tensor, legal_actions: torch.Tensor) -> torch
     return log_policy
 
 
-class DeepNashNet(nn.Module):
+class StrategoNet(nn.Module):
     def __init__(self, inner_channels, outer_channels, N, M, game_config=None):
-        super(DeepNashNet, self).__init__()
+        super(StrategoNet, self).__init__()
 
         self.pyramid = PyramidModule(inner_channels, outer_channels, N, M)
         self.deployment_head = nn.Sequential(

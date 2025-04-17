@@ -17,9 +17,9 @@ from torchrl.collectors import (
 from torchrl.envs import ParallelEnv
 import wandb
 
-from deepnash.nn.agent import DeepNashAgent
-from deepnash.learn.config import RNaDConfig
-from deepnash.learn.vtrace import EntropySchedule, get_loss_nerd, get_loss_v, v_trace
+from deepnash.agents.stratego import StrategoAgent
+from deepnash.training.config import RNaDConfig
+from deepnash.training.vtrace import EntropySchedule, get_loss_nerd, get_loss_v, v_trace
 
 
 def kld(

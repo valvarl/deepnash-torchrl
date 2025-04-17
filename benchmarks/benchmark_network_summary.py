@@ -2,7 +2,7 @@ import argparse
 import torch
 from torchinfo import summary
 
-from deepnash.nn import DeepNashNet
+from deepnash.agents.stratego import StrategoAgent
 
 
 def model_benchmark(inner_channels, outer_channels, N, M, device):

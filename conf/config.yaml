@@ -42,7 +42,7 @@ deepnash:
     monitoring_config:
       wandb: true
 
-env:
+envs:
   stratego:
     stratego_config:
       cpp_backend: true

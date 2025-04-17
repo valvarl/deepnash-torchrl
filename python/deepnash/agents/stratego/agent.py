@@ -3,6 +3,7 @@ Meant as a container for a trained policy. Simplifies the interface for interact
 with the environment
 """
 
+from dataclasses import dataclass
 from typing import Any, Union
 
 import numpy as np
@@ -11,15 +12,25 @@ from tensordict import TensorDictBase
 from tensordict.nn import TensorDictModule
 from torch import Tensor
 
-from .network import DeepNashNet
+from deepnash.agents import DeepNashAgent
+from .network import StrategoNet
 
 
-class DeepNashAgent(TensorDictModule):
-    def __init__(self, compile: bool = False, *args, **kwargs):
-        # TODO: Add Loading from the config at some point. Device should also be a part of the config
-        net = DeepNashNet(320, 256, 2, 2)  # Default
+@dataclass(frozen=True)
+class StrategoAgentConfig:
+    class_name: str = "StrategoAgent"
+    compile: bool = True
+    inner_channels: int = 320
+    outer_channels: int = 256
+    N: int = 2
+    M: int = 2
 
-        if compile:
+
+class StrategoAgent(DeepNashAgent):
+    def __init__(self, cfg: StrategoAgentConfig):
+        net = StrategoNet(cfg.inner_channels, cfg.outer_channels, cfg.N, cfg.M)
+
+        if cfg.compile:
             torch.set_float32_matmul_precision("high")
             net = torch.compile(net, backend="inductor", dynamic=False, fullgraph=True)
 
