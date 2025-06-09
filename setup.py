@@ -19,7 +19,6 @@ class CMakeBuild(build_ext):
         ext_path = Path(self.get_ext_fullpath(ext_name))
 
         build_type = os.getenv("CMAKE_BUILD_TYPE", "Release")
-
         build_temp = Path(self.build_temp) / ext.name
         build_temp.mkdir(parents=True, exist_ok=True)
 
@@ -50,6 +49,11 @@ class CMakeBuild(build_ext):
         )
 
 
+def load_requirements(filename="requirements.txt"):
+    with open(filename, encoding="utf-8") as f:
+        return [line.strip() for line in f if line.strip() and not line.startswith("#")]
+
+
 setup(
     name="deepnash-stratego",
     version="0.1.0",
@@ -60,4 +64,5 @@ setup(
     packages=find_packages("python"),
     package_dir={"": "python"},
     zip_safe=False,
+    install_requires=load_requirements(),
 )

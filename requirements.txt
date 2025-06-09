@@ -1,7 +1,9 @@
+pybind11
 gymnasium~=0.29.0
 numpy
 pygame~=2.6.1
-torchrl
 torch
+torchrl
+torchinfo
 hydra-core
 wandb
